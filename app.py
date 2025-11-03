@@ -1,0 +1,507 @@
+from flask import Flask, render_template, request, redirect, url_for, session, make_response, Response, send_file
+from werkzeug.security import generate_password_hash, check_password_hash
+import sqlite3
+import pandas as pd
+from io import BytesIO, StringIO
+import xlsxwriter
+from fpdf import FPDF
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key'
+
+def get_db_connection():
+    conn = sqlite3.connect('database.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+@app.route('/')
+def home():
+    if 'logged_in' in session:
+        return redirect(url_for('admin'))
+    return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        # Primero verificar el admin hardcoded (para compatibilidad)
+        if username == 'admin' and password == 'adminarthu':
+            session['logged_in'] = True
+            session['username'] = 'admin'
+            return redirect(url_for('admin'))
+        
+        # Luego verificar en la base de datos
+        conn = get_db_connection()
+        # Primero verificar si el usuario existe
+        user = conn.execute(
+            'SELECT * FROM usuarios WHERE nombre_usuario = ?',
+            (username,)
+        ).fetchone()
+        
+        if user:
+            # Verificar que el usuario esté activo
+            if user['estado'] != 'Activo':
+                conn.close()
+                return render_template('login.html', error='Tu cuenta está inactiva. Contacta al administrador.')
+            
+            conn.close()
+            stored_password = user['contraseña']
+            
+            # Intentar verificar con check_password_hash (funciona con hashes y detecta texto plano)
+            # Si la contraseña está hasheada, check_password_hash la verificará
+            # Si está en texto plano, check_password_hash retornará False y verificamos manualmente
+            if check_password_hash(stored_password, password):
+                # Contraseña hasheada y correcta
+                session['logged_in'] = True
+                session['username'] = username
+                session['user_id'] = user['id']
+                session['rol'] = user['rol']
+                return redirect(url_for('admin'))
+            elif stored_password == password:
+                # Contraseña en texto plano (para compatibilidad con usuarios antiguos)
+                # Actualizar a hash para mayor seguridad
+                conn = get_db_connection()
+                hashed_password = generate_password_hash(password)
+                conn.execute('UPDATE usuarios SET contraseña = ? WHERE id = ?', 
+                           (hashed_password, user['id']))
+                conn.commit()
+                conn.close()
+                
+                session['logged_in'] = True
+                session['username'] = username
+                session['user_id'] = user['id']
+                session['rol'] = user['rol']
+                return redirect(url_for('admin'))
+        
+        return render_template('login.html', error='Credenciales inválidas')
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+@app.route('/admin')
+def admin():
+    if 'logged_in' in session:
+        return render_template('admin.html')
+    return redirect(url_for('login'))
+
+@app.route('/pacientes', methods=['GET', 'POST'])
+def pacientes():
+    if 'logged_in' in session:
+        conn = get_db_connection()
+
+        if request.method == 'POST':
+            name = request.form['name']
+            identification_number = request.form['identification_number']
+            date_of_birth = request.form['date_of_birth']
+            gender = request.form['gender']
+            address = request.form['address']
+            phone = request.form['phone']
+            
+            conn.execute('''
+                INSERT INTO patients (name, identification_number, date_of_birth, gender, address, phone)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (name, identification_number, date_of_birth, gender, address, phone))
+            conn.commit()
+        search_name = request.args.get('search_name')
+        query = 'SELECT * FROM patients WHERE 1=1'
+        params = []
+        if search_name:
+            query += ' AND name LIKE ?'
+            params.append(f'%{search_name}%')
+        pacientes = conn.execute(query, params).fetchall()
+        conn.close()
+        return render_template('pacientes.html', pacientes=pacientes)
+    return redirect(url_for('login'))
+
+
+@app.route('/editar_paciente/<int:id>', methods=['GET', 'POST'])
+def editar_paciente(id):
+    conn = get_db_connection()
+    paciente = conn.execute('SELECT * FROM patients WHERE id = ?', (id,)).fetchone()
+    if request.method == 'POST':
+        name = request.form['name']
+        identification_number = request.form['identification_number']
+        date_of_birth = request.form['date_of_birth']
+        gender = request.form['gender']
+        address = request.form['address']
+        phone = request.form['phone']
+        conn.execute('''
+            UPDATE patients
+            SET name = ?, identification_number = ?, date_of_birth = ?, gender = ?, address = ?, phone = ?
+            WHERE id = ?
+        ''', (name, identification_number, date_of_birth, gender, address, phone, id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('pacientes'))
+    conn.close()
+    return render_template('editar_paciente.html', paciente=paciente)
+
+@app.route('/eliminar_paciente/<int:id>')
+def eliminar_paciente(id):
+    conn = get_db_connection()
+    conn.execute('DELETE FROM patients WHERE id = ?', (id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('pacientes'))
+
+@app.route('/pruebas_paciente', methods=['GET', 'POST'])
+def pruebas_paciente():
+    conn = get_db_connection()
+    if request.method == 'POST':
+        patient_id = request.form['patient_id']
+        test_id = request.form['test_id']
+        test_date = request.form['test_date']
+        result = request.form['result']
+        result_date = request.form['result_date']
+        laboratory = request.form['laboratory']
+        
+        conn.execute('INSERT INTO pruebas_paciente (patient_id, test_id, test_date, result, result_date, laboratory) VALUES (?, ?, ?, ?, ?, ?)',
+                     (patient_id, test_id, test_date, result, result_date, laboratory))
+        conn.commit()
+    pacientes = conn.execute('SELECT id, name FROM patients').fetchall()
+    pruebas = conn.execute('SELECT id, name FROM pruebas').fetchall()
+    search_name = request.args.get('search_name')
+    query = '''
+        SELECT
+            pp.id,
+            p.name AS patient_name,
+            t.name AS test_name,
+            pp.test_date,
+            pp.result,
+            pp.result_date,
+            pp.laboratory
+        FROM pruebas_paciente pp
+        JOIN patients p ON pp.patient_id = p.id
+        JOIN pruebas t ON pp.test_id = t.id
+        WHERE 1=1
+    '''
+    params = []
+    if search_name:
+        query += ' AND p.name LIKE ?'
+        params.append(f'%{search_name}%')
+    pruebas_paciente = conn.execute(query, params).fetchall()
+    conn.close()
+    return render_template('pruebas_paciente.html', pacientes=pacientes, pruebas=pruebas, pruebas_paciente=pruebas_paciente)
+@app.route('/editar_prueba_paciente/<int:id>', methods=['GET', 'POST'])
+def editar_prueba_paciente(id):
+    conn = get_db_connection()
+    prueba = conn.execute('SELECT * FROM pruebas_paciente WHERE id = ?', (id,)).fetchone()
+    if prueba is None:
+        conn.close()
+        return "Prueba no encontrada", 404
+    pacientes = conn.execute('SELECT id, name FROM patients').fetchall()
+    pruebas = conn.execute('SELECT id, name FROM pruebas').fetchall()
+    if request.method == 'POST':
+        patient_id = request.form['patient_id']
+        test_id = request.form['test_id']
+        test_date = request.form['test_date']
+        result = request.form['result']
+        result_date = request.form['result_date']
+        laboratory = request.form['laboratory']
+        conn.execute('UPDATE pruebas_paciente SET patient_id = ?, test_id = ?, test_date = ?, result = ?, result_date = ?, laboratory = ? WHERE id = ?',
+                     (patient_id, test_id, test_date, result, result_date, laboratory, id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('pruebas_paciente'))
+    conn.close()
+    return render_template('editar_prueba_paciente.html', prueba=prueba, pacientes=pacientes, pruebas=pruebas)
+
+@app.route('/eliminar_prueba_paciente/<int:id>')
+def eliminar_prueba_paciente(id):
+    conn = get_db_connection()
+    conn.execute('DELETE FROM pruebas_paciente WHERE id = ?', (id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('pruebas_paciente'))
+
+@app.route('/pruebas', methods=['GET', 'POST'])
+def pruebas():
+    conn = get_db_connection()
+    
+    if request.method == 'POST':
+        name = request.form['name']
+        code = request.form['code']
+        description = request.form['description']
+        category = request.form['category']
+        method = request.form['method']
+        duration = request.form['duration']
+        status = request.form['status']
+        conn.execute('INSERT INTO pruebas (name, code, description, category, method, duration, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                     (name, code, description, category, method, duration, status))
+        conn.commit()
+    search_name = request.args.get('search_name')
+    query = 'SELECT * FROM pruebas WHERE 1=1'
+    params = []
+    if search_name:
+        query += ' AND name LIKE ?'
+        params.append(f'%{search_name}%')
+    pruebas = conn.execute(query, params).fetchall()
+    conn.close()
+    return render_template('pruebas.html', pruebas=pruebas)
+
+@app.route('/editar_prueba/<int:id>', methods=['GET', 'POST'])
+def editar_prueba(id):
+    conn = get_db_connection()
+    prueba = conn.execute('SELECT * FROM pruebas WHERE id = ?', (id,)).fetchone()
+    if request.method == 'POST':
+        nombre = request.form['name'] 
+        codigo = request.form['code']
+        descripcion = request.form['description']
+        categoria = request.form['category']
+        metodo = request.form['method']
+        duracion = request.form['duration']
+        estado = request.form['status']
+        conn.execute('''
+            UPDATE pruebas
+            SET name = ?, code = ?, description = ?, category = ?, method = ?, duration = ?, status = ?
+            WHERE id = ?
+        ''', (nombre, codigo, descripcion, categoria, metodo, duracion, estado, id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('pruebas'))
+    conn.close()
+    return render_template('editar_prueba.html', prueba=prueba)
+
+@app.route('/eliminar_prueba/<int:id>')
+def eliminar_prueba(id):
+    conn = get_db_connection()
+    conn.execute('DELETE FROM pruebas WHERE id = ?', (id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('pruebas'))
+
+@app.route('/usuarios', methods=['GET', 'POST'])
+def usuarios():
+    conn = get_db_connection()
+    if request.method == 'POST':
+        rol = request.form['rol']
+        nombre_completo = request.form['nombre_completo']
+        correo_electronico = request.form['correo_electronico']
+        nombre_usuario = request.form['nombre_usuario']
+        contraseña = request.form['contraseña']
+        confirmacion_contraseña = request.form['confirmacion_contraseña']
+        numero_telefono = request.form['numero_telefono']
+        estado = request.form['estado']
+        fecha_creacion = request.form['fecha_creacion']
+
+        if contraseña != confirmacion_contraseña:
+            return "Las contraseñas no coinciden"
+        # Hashear la contraseña antes de guardarla
+        hashed_password = generate_password_hash(contraseña)
+        conn.execute('INSERT INTO usuarios (rol, nombre_completo, correo_electronico, nombre_usuario, contraseña, numero_telefono, estado, fecha_creacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                     (rol, nombre_completo, correo_electronico, nombre_usuario, hashed_password, numero_telefono, estado, fecha_creacion))
+        conn.commit()
+    search_name = request.args.get('search_name')
+    query = 'SELECT * FROM usuarios WHERE 1=1'
+    params = []
+    if search_name:
+        query += ' AND nombre_completo LIKE ?'
+        params.append(f'%{search_name}%')
+    usuarios = conn.execute(query, params).fetchall()
+    conn.close()
+    return render_template('usuarios.html', usuarios=usuarios)
+
+@app.route('/editar_usuario/<int:id>', methods=['GET', 'POST'])
+def editar_usuario(id):
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM usuarios WHERE id = ?', (id,)).fetchone()
+    if request.method == 'POST':
+        nombre = request.form['nombre_completo']
+        correo = request.form['correo_electronico']
+        nombre_usuario = request.form['nombre_usuario']
+        telefono = request.form['numero_telefono']
+        rol = request.form['rol']
+        estado = request.form['estado']
+        password = request.form.get('contraseña')
+        conn.execute('UPDATE usuarios SET nombre_completo = ?, correo_electronico = ?, nombre_usuario = ?, numero_telefono = ?, rol = ?, estado = ? WHERE id = ?',
+                     (nombre, correo, nombre_usuario, telefono, rol, estado, id))
+        if password:
+            hashed_password = generate_password_hash(password)
+            conn.execute('UPDATE usuarios SET nombre_completo = ?, correo_electronico = ?, nombre_usuario = ?, numero_telefono = ?, rol = ?, estado = ?, contraseña = ? WHERE id = ?',
+                         (nombre, correo, nombre_usuario, telefono, rol, estado, hashed_password, id))
+        else:
+            conn.execute('UPDATE usuarios SET nombre_completo = ?, correo_electronico = ?, nombre_usuario = ?, numero_telefono = ?, rol = ?, estado = ? WHERE id = ?',
+                         (nombre, correo, nombre_usuario, telefono, rol, estado, id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('usuarios'))
+    conn.close()
+    return render_template('editar_usuario.html', user=user)
+
+@app.route('/eliminar_usuario/<int:id>')
+def eliminar_usuario(id):
+    conn = get_db_connection()
+    conn.execute('DELETE FROM usuarios WHERE id = ?', (id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('usuarios'))
+
+@app.route('/informes', methods=['GET'])
+def informes():
+    conn = get_db_connection()
+    total_pacientes = conn.execute('SELECT COUNT(*) FROM patients').fetchone()[0]
+    total_pruebas = conn.execute('SELECT COUNT(*) FROM pruebas_paciente').fetchone()[0]
+    pacientes_por_estado = conn.execute('''
+        SELECT 
+            t.name AS tipo_prueba,
+            pp.result,
+            COUNT(pp.id) AS cantidad
+        FROM pruebas_paciente pp
+        JOIN pruebas t ON pp.test_id = t.id
+        GROUP BY t.name, pp.result
+    ''').fetchall()
+    conn.close()
+    return render_template('informes.html',
+                           total_pacientes=total_pacientes,
+                           total_pruebas=total_pruebas,
+                           pacientes_por_estado=pacientes_por_estado)
+
+@app.route('/informes/detalle', methods=['GET', 'POST'])
+def informes_detalle():
+    conn = get_db_connection()
+    if request.method == 'POST':
+        search_query = request.form.get('search_query')
+        if search_query:
+            pacientes = conn.execute('''SELECT * FROM patients WHERE name LIKE ? OR identification_number LIKE ?''', 
+                                     ('%' + search_query + '%', '%' + search_query + '%')).fetchall()
+            pruebas = conn.execute(''' 
+                SELECT pp.id, p.name AS patient_name, t.name AS test_name, t.code, pp.test_date, pp.result, pp.result_date, pp.laboratory
+                FROM pruebas_paciente pp
+                JOIN patients p ON pp.patient_id = p.id
+                JOIN pruebas t ON pp.test_id = t.id
+                WHERE p.name LIKE ? OR p.identification_number LIKE ?
+            ''', ('%' + search_query + '%', '%' + search_query + '%')).fetchall()
+        else:
+            pacientes = conn.execute('SELECT * FROM patients').fetchall()
+            pruebas = conn.execute(''' 
+                SELECT pp.id, p.name AS patient_name, t.name AS test_name, t.code, pp.test_date, pp.result, pp.result_date, pp.laboratory
+                FROM pruebas_paciente pp
+                JOIN patients p ON pp.patient_id = p.id
+                JOIN pruebas t ON pp.test_id = t.id
+            ''').fetchall()
+        if 'export_excel' in request.form:
+            df = pd.DataFrame(pruebas, columns=['id', 'patient_name', 'test_name', 'code', 'test_date', 'result', 'result_date', 'laboratory'])
+            df = df.drop(columns=['id'])
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Pruebas')
+            output.seek(0)
+            return Response(
+                output,
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": "attachment;filename=pruebas.xlsx"}
+            )
+        conn.close()
+        return render_template('informes_detalle.html', pacientes=pacientes, pruebas=pruebas)
+    else:
+        pacientes = conn.execute('SELECT * FROM patients').fetchall()
+        pruebas = conn.execute(''' 
+            SELECT pp.id, p.name AS patient_name, t.name AS test_name, t.code, pp.test_date, pp.result, pp.result_date, pp.laboratory
+            FROM pruebas_paciente pp
+            JOIN patients p ON pp.patient_id = p.id
+            JOIN pruebas t ON pp.test_id = t.id
+        ''').fetchall()
+        conn.close()
+        return render_template('informes_detalle.html', pacientes=pacientes, pruebas=pruebas)
+    
+@app.route('/informes/exportar', methods=['POST'])
+def exportar_datos():
+    format = request.form['format']
+    conn = get_db_connection()
+    df = pd.read_sql_query('''
+        SELECT pruebas_paciente.*, patients.name AS patient_name, pruebas.name AS test_name
+        FROM pruebas_paciente
+        JOIN patients ON pruebas_paciente.patient_id = patients.id
+        JOIN pruebas ON pruebas_paciente.test_id = pruebas.id
+    ''', conn)
+    conn.close()
+    if format == 'csv':
+        output = StringIO()
+        df.to_csv(output, index=False)
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers["Content-Disposition"] = "attachment; filename=informes.csv"
+        response.headers["Content-type"] = "text/csv"
+        return response
+    elif format == 'excel':
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False)
+        output.seek(0)
+        response = make_response(output.read())
+        response.headers["Content-Disposition"] = "attachment; filename=informes.xlsx"
+        response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        return response
+
+@app.route('/informacion', methods=['GET', 'POST'])
+def informacion():
+    conn = get_db_connection()
+    resultados = []
+    if request.method == 'POST':
+        nombre = request.form.get('nombre')
+        carnet = request.form.get('carnet')
+        query = '''
+        SELECT p.id, p.name, p.identification_number, pp.test_id, pp.test_date, pp.result
+        FROM patients p
+        JOIN pruebas_paciente pp ON p.id = pp.patient_id
+        WHERE p.name LIKE ? AND p.identification_number LIKE ?
+        '''
+        params = [f'%{nombre}%', f'%{carnet}%']
+        df = pd.read_sql_query(query, conn, params=params)
+        resultados = df.to_dict(orient='records')
+        conn.close()
+        if 'export_pdf' in request.form:
+            return exportar_pdf(resultados)
+        return render_template('informacion.html', resultados=resultados)
+    return render_template('informacion.html')
+
+def export_to_excel_func():
+    conn = get_db_connection()
+    pacientes = pd.read_sql_query('SELECT * FROM patients', conn)
+    pruebas = pd.read_sql_query('SELECT * FROM pruebas_paciente', conn)
+    conn.close()
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        pacientes.to_excel(writer, sheet_name='Pacientes', index=False)
+        pruebas.to_excel(writer, sheet_name='Pruebas', index=False)
+    output.seek(0)
+    response = make_response(output.read())
+    response.headers["Content-Disposition"] = "attachment; filename=informes_detalle.xlsx"
+    response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return response
+
+def exportar_pdf(resultados):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(200, 10, txt='Informe de Pruebas', ln=True, align='C')
+    pdf.ln(10)
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(40, 10, 'ID Paciente', 1)
+    pdf.cell(60, 10, 'Nombre', 1)
+    pdf.cell(40, 10, 'Carnet', 1)
+    pdf.cell(30, 10, 'ID Prueba', 1)
+    pdf.cell(30, 10, 'Fecha', 1)
+    pdf.cell(30, 10, 'Resultado', 1)
+    pdf.ln()
+    pdf.set_font('Arial', '', 10)
+    for resultado in resultados:
+        pdf.cell(40, 10, str(resultado['id']), 1)
+        pdf.cell(60, 10, resultado['name'], 1)
+        pdf.cell(40, 10, resultado['identification_number'], 1)
+        pdf.cell(30, 10, str(resultado['test_id']), 1)
+        pdf.cell(30, 10, resultado['test_date'], 1)
+        pdf.cell(30, 10, resultado['result'], 1)
+        pdf.ln()
+    buffer = BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name='informe_pruebas.pdf', mimetype='application/pdf')
+
+if __name__ == '__main__':
+    app.run(debug=True)

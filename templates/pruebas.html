@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pruebas</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="static/styles.css">
+    <script src="static/script.js" defer></script>
+</head>
+<body class="bg-light" style="padding-top: 20px;">
+    <div class="container-fluid mt-5">
+        <div class="card p-4 mx-auto" style="max-width: 1300px;">
+            <div class="card-body">
+            <h2 class="text-center mb-4">Añadir Prueba</h2>
+            <form method="POST" action="/pruebas" class="form-section">
+                <div class="form-group">
+                    <label for="name">Nombre de la Prueba:</label>
+                    <select class="form-control" id="name" name="name" required onchange="updateCode()">
+                        <option value="PCR">PCR</option>
+                        <option value="Antígeno">Antígeno</option>
+                        <option value="Anticuerpos">Anticuerpos</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="code">Código de la Prueba:</label>
+                    <input type="text" class="form-control" id="code" name="code" required readonly>
+                </div>
+                <div class="form-group">
+                    <label for="description">Descripción de la Prueba:</label>
+                    <textarea class="form-control" id="description" name="description" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="category">Categoría:</label>
+                    <select class="form-control" id="category" name="category" required>
+                        <option value="Diagnóstico">Diagnóstico</option>
+                        <option value="Seguimiento">Seguimiento</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="method">Método de Realización:</label>
+                    <select class="form-control" id="method" name="method" required>
+                        <option value="Hisopado nasal">Hisopado nasal</option>
+                        <option value="Análisis de sangre">Análisis de sangre</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="duration">Duración Estimada:</label>
+                    <input type="text" class="form-control" id="duration" name="duration" required>
+                </div>
+                <div class="form-group">
+                    <label for="status">Estado de la Prueba:</label>
+                    <select class="form-control" id="status" name="status" required>
+                        <option value="Activo">Activo</option>
+                        <option value="Inactivo">Inactivo</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-success btn-block">Agregar Prueba</button>
+            </form>
+
+            <h2 class="text-center mt-5 mb-4">Lista de Pruebas</h2>
+            <div class="form-row">
+                <div class="col-auto">
+                    <form method="GET" action="/pruebas">
+                        <input type="text" name="search_name" placeholder="Buscar por nombre" class="form-control" style="width: 1114px; display: inline-block;">
+                </div>
+                <div class="col-auto">
+                    <input type="submit" value="Buscar" class="btn btn-primary">
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Código</th>
+                            <th>Descripción</th>
+                            <th>Categoría</th>
+                            <th>Método</th>
+                            <th>Duración</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prueba in pruebas %}
+                        <tr>
+                            <td>{{ prueba.id }}</td>
+                            <td>{{ prueba.name }}</td>
+                            <td>{{ prueba.code }}</td>
+                            <td>{{ prueba.description }}</td>
+                            <td>{{ prueba.category }}</td>
+                            <td>{{ prueba.method }}</td>
+                            <td>{{ prueba.duration }}</td>
+                            <td>{{ prueba.status }}</td>
+                            <td>
+                                <a href="{{ url_for('editar_prueba', id=prueba.id) }}" class="btn btn-warning btn-sm">Editar</a>
+                                <a href="{{ url_for('eliminar_prueba', id=prueba.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de que deseas eliminar esta prueba?');">Eliminar</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <a href="/" class="btn btn-primary btn-salir">Salir</a>
+            </div>
+        </div>
+    </div>
+    <script src="static/script.js"></script>
+</body>
+</html>

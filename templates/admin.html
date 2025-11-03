@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de control</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="static/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="d-flex">
+        <div class="sidebar bg-primary">
+            <nav class="navbar navbar-expand-lg navbar-dark flex-column">
+                <ul class="navbar-nav w-100">
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="/pacientes">Pacientes</a>
+                        <a class="nav-link text-white" href="/pruebas_paciente">Pruebas Paciente</a>
+                        <a class="nav-link text-white" href="/pruebas">Pruebas</a>
+                        <a class="nav-link text-white" href="/usuarios">Usuarios</a>
+                        <a class="nav-link text-white" href="/informes">Informes</a>
+                        <a class="nav-link text-white" href="/logout">Cerrar Sesión</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+
+        <div class="main-content flex-grow-1 p-4">
+            <div class="container">
+                <h1 class="display-4 text-primary">Bienvenido al Panel de Control</h1>
+                
+                <canvas id="graficaEstadoAdmin" width="400" height="200"></canvas>
+                
+                <form id="add-patient-form">
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="static/script.js"></script>
+</body>
+</html>

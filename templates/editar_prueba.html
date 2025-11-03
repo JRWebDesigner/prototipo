@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Editar Prueba</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="static/styles.css">
+    <script src="static/script.js" defer></script>
+</head>
+<body class="container mt-4">
+    <a href="{{ url_for('pruebas') }}" class="btn btn-secondary mb-3">Regresar</a>
+    <form method="POST" action="{{ url_for('editar_prueba', id=prueba.id) }}">
+        <h2>Editar Prueba</h2>
+        <div class="form-group">
+            <label for="name">Nombre de la Prueba:</label>
+            <select class="form-control" id="name" name="name" required onchange="updateCode()">
+                <option value="PCR" {% if prueba.name == 'PCR' %}selected{% endif %}>PCR</option>
+                <option value="Antígeno" {% if prueba.name == 'Antígeno' %}selected{% endif %}>Antígeno</option>
+                <option value="Anticuerpos" {% if prueba.name == 'Anticuerpos' %}selected{% endif %}>Anticuerpos</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="code">Código de la Prueba:</label>
+            <input type="text" class="form-control" id="code" name="code" value="{{ prueba.code }}" readonly>
+        </div>
+        <div class="form-group">
+            <label for="description">Descripción de la Prueba:</label>
+            <textarea class="form-control" id="description" name="description" required>{{ prueba.description }}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="category">Categoría:</label>
+            <select class="form-control" id="category" name="category" required>
+                <option value="Diagnóstico" {% if prueba.category == 'Diagnóstico' %}selected{% endif %}>Diagnóstico</option>
+                <option value="Seguimiento" {% if prueba.category == 'Seguimiento' %}selected{% endif %}>Seguimiento</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="method">Método de Realización:</label>
+            <select class="form-control" id="method" name="method" required>
+                <option value="Hisopado nasal" {% if prueba.method == 'Hisopado nasal' %}selected{% endif %}>Hisopado nasal</option>
+                <option value="Análisis de sangre" {% if prueba.method == 'Análisis de sangre' %}selected{% endif %}>Análisis de sangre</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="duration">Duración Estimada:</label>
+            <input type="text" class="form-control" id="duration" name="duration" value="{{ prueba.duration }}" required>
+        </div>
+        <div class="form-group">
+            <label for="status">Estado de la Prueba:</label>
+            <select class="form-control" id="status" name="status" required>
+                <option value="Activo" {% if prueba.status == 'Activo' %}selected{% endif %}>Activo</option>
+                <option value="Inactivo" {% if prueba.status == 'Inactivo' %}selected{% endif %}>Inactivo</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+    </form>
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            updateCode();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pruebas de Paciente</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="static/styles.css">
+    <script src="static/script.js" defer></script>
+</head>
+<body class="bg-light" style="padding-top: 20px;">
+    <div class="container-fluid mt-5">
+        <div class="card p-4 mx-auto" style="max-width: 1300px;"> 
+            <div class="card-body">
+            <h2 class="text-center mb-4">Añadir Prueba de Paciente</h2>
+            <form method="POST" action="{{ url_for('pruebas_paciente') }}">
+                <div class="form-group">
+                    <label for="patient_id">Paciente:</label>
+                    <select name="patient_id" id="patient_id" class="form-control" required>
+                        {% for paciente in pacientes %}
+                        <option value="{{ paciente.id }}">{{ paciente.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="test_id">Prueba:</label>
+                    <select name="test_id" id="test_id" class="form-control" required>
+                        {% for prueba in pruebas %}
+                        <option value="{{ prueba.id }}">{{ prueba.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="test_date">Fecha de Prueba:</label>
+                    <input type="date" name="test_date" id="test_date" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="result">Resultado:</label>
+                    <input type="text" name="result" id="result" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="result_date">Fecha de Resultado:</label>
+                    <input type="date" name="result_date" id="result_date" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="laboratory">Laboratorio:</label>
+                    <input type="text" name="laboratory" id="laboratory" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-success btn-block">Agregar Prueba</button>
+            </form>
+
+            <h2 class="text-center mt-5 mb-4">Pruebas Registradas</h2>
+            <div class="form-row">
+                <div class="col-auto">
+                    <form method="GET" action="/pruebas paciente">
+                        <input type="text" name="search_name" placeholder="Buscar por nombre" class="form-control" style="width: 1114px; display: inline-block;">
+                </div>
+                <div class="col-auto">
+                    <input type="submit" value="Buscar" class="btn btn-primary">
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre del Paciente</th>
+                            <th>Nombre de la Prueba</th>
+                            <th>Fecha de Prueba</th>
+                            <th>Resultado</th>
+                            <th>Fecha de Resultado</th>
+                            <th>Laboratorio</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prueba in pruebas_paciente %}
+                        <tr>
+                            <td>{{ prueba.id }}</td>
+                            <td>{{ prueba.patient_name }}</td>
+                            <td>{{ prueba.test_name }}</td>
+                            <td>{{ prueba.test_date }}</td>
+                            <td>{{ prueba.result }}</td>
+                            <td>{{ prueba.result_date }}</td>
+                            <td>{{ prueba.laboratory }}</td>
+                            <td>
+                                <div class="d-flex justify-content-around">
+                                    <a href="{{ url_for('editar_prueba_paciente', id=prueba.id) }}" class="btn btn-warning btn-sm">Editar</a>
+                                    <a href="{{ url_for('eliminar_prueba_paciente', id=prueba.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de que deseas eliminar esta prueba?');">Eliminar</a>
+                                </div>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <a href="/" class="btn btn-primary btn-salir">Salir</a>
+            </div>  
+        </div>
+    </div>
+</body>
+</html>

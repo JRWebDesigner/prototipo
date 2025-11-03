@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Editar Paciente</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="static/styles.css">
+    <script src="static/script.js" defer></script>
+</head>
+<body class="container mt-4">
+    <a href="{{ url_for('pacientes') }}" class="btn btn-secondary mb-3">Regresar</a>
+    <form method="post" action="{{ url_for('editar_paciente', id=paciente.id) }}">
+        <h2>Editar Paciente</h2>
+        <div class="form-group">
+            <label for="name">Nombre:</label>
+            <input type="text" class="form-control" id="name" name="name" value="{{ paciente.name }}" required>
+        </div>
+        <div class="form-group">
+            <label for="identification_number">Número de Identificación:</label>
+            <input type="text" class="form-control" id="identification_number" name="identification_number" value="{{ paciente.identification_number }}" required>
+        </div>
+        <div class="form-group">
+            <label for="date_of_birth">Fecha de Nacimiento:</label>
+            <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" value="{{ paciente.date_of_birth }}" required>
+        </div>
+        <div class="form-group">
+            <label for="gender">Sexo:</label>
+            <input type="text" class="form-control" id="gender" name="gender" value="{{ paciente.gender }}" required>
+        </div>
+        <div class="form-group">
+            <label for="address">Dirección:</label>
+            <input type="text" class="form-control" id="address" name="address" value="{{ paciente.address }}" required>
+        </div>
+        <div class="form-group">
+            <label for="phone">Teléfono:</label>
+            <input type="text" class="form-control" id="phone" name="phone" value="{{ paciente.phone }}" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Guardar cambio</button>
+    </form>
+</body>
+</html>
+

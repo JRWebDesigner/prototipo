@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informe Detallado</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="static/styles.css">
+    <script src="static/script.js" defer></script>
+    <style>
+        .table {
+            background-color: #f8f9fa; 
+            border: 1px solid #007bff; 
+        }
+        .table-striped tbody tr:nth-of-type(odd) {
+            background-color: #e7f3ff; 
+        }
+        .thead-dark th {
+            background-color: #007bff; 
+            color: white; 
+        }
+        .btn {
+            transition: background-color 0.3s; 
+        }
+        .btn:hover {
+            background-color: #0056b3; 
+        }
+    </style>
+</head>
+<body class="container mt-4">
+    <h2 class="mb-4">Informe Detallado</h2>
+    <a href="{{ url_for('informes') }}" class="btn btn-secondary mb-3">Regresar</a>
+
+    <form method="post" class="form-inline mb-4">
+        <input type="text" name="search_query" class="form-control mr-2" placeholder="Buscar...">
+        <button type="submit" class="btn btn-primary">Buscar</button>
+        <button type="submit" name="export_excel" class="btn btn-success ml-2">Exportar a Excel</button>
+    </form>
+
+    <h3>Pacientes</h3>
+    <table class="table table-striped table-bordered">
+        <thead class="thead-dark">
+            <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Número de Identificación</th>
+                <th>Fecha de Nacimiento</th>
+                <th>Género</th>
+                <th>Dirección</th>
+                <th>Teléfono</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for paciente in pacientes %}
+            <tr>
+                <td>{{ paciente.id }}</td>
+                <td>{{ paciente.name }}</td>
+                <td>{{ paciente.identification_number }}</td>
+                <td>{{ paciente.date_of_birth }}</td>
+                <td>{{ paciente.gender }}</td>
+                <td>{{ paciente.address }}</td>
+                <td>{{ paciente.phone }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3>Pruebas de Pacientes</h3>
+    <table class="table table-striped table-bordered">
+        <thead class="thead-dark">
+            <tr>
+                <th>Nombre de Paciente</th>
+                <th>Nombre de Prueba</th>
+                <th>Código</th>
+                <th>Fecha de Prueba</th>
+                <th>Resultado</th>
+                <th>Fecha de Resultado</th>
+                <th>Laboratorio</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for prueba in pruebas %}
+            <tr>
+                <td>{{ prueba.patient_name }}</td>
+                <td>{{ prueba.test_name }}</td>
+                <td>{{ prueba.code }}</td>
+                <td>{{ prueba.test_date }}</td>
+                <td>{{ prueba.result }}</td>
+                <td>{{ prueba.result_date }}</td>
+                <td>{{ prueba.laboratory }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

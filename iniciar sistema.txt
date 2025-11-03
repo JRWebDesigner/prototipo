@@ -1,0 +1,6 @@
+iniciar desde cmd en la carpeta protoripo: python app.py
+direccion del proyecto:http://127.0.0.1:5000
+usuario y contraseña: usuario=admin
+		      contraseña=adminarthu
+http://127.0.0.1:5000/admin
+esto es solo ladireccion de informacion: http://127.0.0.1:5000/informacion

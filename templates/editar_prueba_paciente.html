@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Editar Prueba de Paciente</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="static/styles.css">
+    <script src="static/script.js" defer></script>
+</head>
+<body class="container mt-4">
+    <a href="{{ url_for('pruebas_paciente') }}" class="btn btn-secondary mb-3">Regresar</a>
+    <form method="post" action="{{ url_for('editar_prueba_paciente', id=prueba['id']) }}">
+        <h2>Editar Prueba de Paciente</h2>
+        <div class="form-group">
+            <label for="patient_id">Paciente:</label>
+            <select class="form-control" name="patient_id" id="patient_id" required>
+                {% for paciente in pacientes %}
+                    <option value="{{ paciente.id }}" {% if paciente.id == prueba['patient_id'] %}selected{% endif %}>{{ paciente.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="test_id">Prueba:</label>
+            <select class="form-control" name="test_id" id="test_id" required>
+                {% for prueba_item in pruebas %}
+                    <option value="{{ prueba_item.id }}" {% if prueba_item.id == prueba['test_id'] %}selected{% endif %}>{{ prueba_item.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="test_date">Fecha de Prueba:</label>
+            <input type="date" class="form-control" name="test_date" value="{{ prueba['test_date'] }}" required>
+        </div>
+        <div class="form-group">
+            <label for="result">Resultado:</label>
+            <input type="text" class="form-control" name="result" value="{{ prueba['result'] }}" required>
+        </div>
+        <div class="form-group">
+            <label for="result_date">Fecha de Resultado:</label>
+            <input type="date" class="form-control" name="result_date" value="{{ prueba['result_date'] }}" required>
+        </div>
+        <div class="form-group">
+            <label for="laboratory">Laboratorio:</label>
+            <input type="text" class="form-control" name="laboratory" value="{{ prueba['laboratory'] }}" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Guardar Cambio</button>
+    </form>
+</body>
+</html>
+
+

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informes</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="static/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="static/script.js" defer></script>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="card">
+            <h2 class="text-center">Resumen de Datos</h2>
+            <div class="card-body">
+                <p><strong>Total de Pacientes:</strong> {{ total_pacientes }}</p>
+                <p><strong>Total de Pruebas Realizadas:</strong> {{ total_pruebas }}</p>
+
+                <h2 class="mt-4">Pacientes por Estado de Pruebas</h2>
+                <table class="table table-bordered table-hover">
+                    <thead>
+                        <tr>
+                            <th>Tipo de Prueba</th>
+                            <th>Resultado</th>
+                            <th>Cantidad de Pacientes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for estado in pacientes_por_estado %}
+                        <tr>
+                            <td>{{ estado.tipo_prueba }}</td>
+                            <td>{{ estado.result }}</td>
+                            <td>{{ estado.cantidad }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <h2 class="mt-4">Informes Detallados</h2>
+                <a href="{{ url_for('informes_detalle') }}" class="btn btn-primary">Ver Informe Detallado</a>
+
+                <h2 class="mt-4">Opciones de Exportación</h2>
+                <form action="{{ url_for('exportar_datos') }}" method="post">
+                    <div class="form-group">
+                        <label for="format">Selecciona el formato para exportar:</label>
+                        <select id="format" name="format" class="form-control" required>
+                            <option value="excel">Excel</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success">Exportar</button>
+                </form>
+                <a href="/" class="btn btn-primary btn-salir">Salir</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
