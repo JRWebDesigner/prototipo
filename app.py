@@ -43,6 +43,25 @@ def is_empleado():
     """Verifica si el usuario actual es empleado"""
     return session.get('rol') == 'empleado'
 
+def get_user_context():
+    """Obtiene el contexto del usuario para las plantillas"""
+    username = session.get('username', 'Usuario')
+    rol = session.get('rol', 'Sin rol')
+    nombre_completo = username
+    
+    if 'user_id' in session:
+        conn = get_db_connection()
+        user = conn.execute('SELECT nombre_completo FROM usuarios WHERE id = ?', (session['user_id'],)).fetchone()
+        conn.close()
+        if user:
+            nombre_completo = user['nombre_completo']
+    
+    return {
+        'username': nombre_completo,
+        'rol': rol,
+        'current_user': session.get('username')
+    }
+
 @app.route('/')
 def home():
     if 'logged_in' in session:
@@ -136,6 +155,7 @@ def pacientes():
     conn = get_db_connection()
 
     if request.method == 'POST':
+        # Todos los usuarios pueden agregar pacientes
         name = request.form['name']
         identification_number = request.form['identification_number']
         date_of_birth = request.form['date_of_birth']
@@ -155,8 +175,18 @@ def pacientes():
         query += ' AND name LIKE ?'
         params.append(f'%{search_name}%')
     pacientes = conn.execute(query, params).fetchall()
+    
+    # Obtener información del usuario para el menú
+    username = session.get('username', 'Usuario')
+    rol = session.get('rol', 'Sin rol')
+    nombre_completo = username
+    if 'user_id' in session:
+        user = conn.execute('SELECT nombre_completo FROM usuarios WHERE id = ?', (session['user_id'],)).fetchone()
+        if user:
+            nombre_completo = user['nombre_completo']
     conn.close()
-    return render_template('pacientes.html', pacientes=pacientes, is_admin=is_admin())
+    
+    return render_template('pacientes.html', pacientes=pacientes, is_admin=is_admin(), username=nombre_completo, rol=rol, current_user=session.get('username'))
 
 
 @app.route('/editar_paciente/<int:id>', methods=['GET', 'POST'])
@@ -230,7 +260,14 @@ def pruebas_paciente():
         params.append(f'%{search_name}%')
     pruebas_paciente = conn.execute(query, params).fetchall()
     conn.close()
-    return render_template('pruebas_paciente.html', pacientes=pacientes, pruebas=pruebas, pruebas_paciente=pruebas_paciente, is_admin=is_admin())
+    context = get_user_context()
+    context.update({
+        'pacientes': pacientes,
+        'pruebas': pruebas,
+        'pruebas_paciente': pruebas_paciente,
+        'is_admin': is_admin()
+    })
+    return render_template('pruebas_paciente.html', **context)
 @app.route('/editar_prueba_paciente/<int:id>', methods=['GET', 'POST'])
 @require_role('admin')
 def editar_prueba_paciente(id):
@@ -289,7 +326,12 @@ def pruebas():
         params.append(f'%{search_name}%')
     pruebas = conn.execute(query, params).fetchall()
     conn.close()
-    return render_template('pruebas.html', pruebas=pruebas, is_admin=is_admin())
+    context = get_user_context()
+    context.update({
+        'pruebas': pruebas,
+        'is_admin': is_admin()
+    })
+    return render_template('pruebas.html', **context)
 
 @app.route('/editar_prueba/<int:id>', methods=['GET', 'POST'])
 @require_role('admin')
@@ -341,6 +383,11 @@ def usuarios():
 
         if contraseña != confirmacion_contraseña:
             return "Las contraseñas no coinciden"
+        # Normalizar el rol: convertir "Administrador" a "admin" y "Empleado" a "empleado"
+        if rol == "Administrador":
+            rol = "admin"
+        elif rol == "Empleado":
+            rol = "empleado"
         # Hashear la contraseña antes de guardarla
         hashed_password = generate_password_hash(contraseña)
         conn.execute('INSERT INTO usuarios (rol, nombre_completo, correo_electronico, nombre_usuario, contraseña, numero_telefono, estado, fecha_creacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -354,7 +401,12 @@ def usuarios():
         params.append(f'%{search_name}%')
     usuarios = conn.execute(query, params).fetchall()
     conn.close()
-    return render_template('usuarios.html', usuarios=usuarios, is_admin=is_admin())
+    context = get_user_context()
+    context.update({
+        'usuarios': usuarios,
+        'is_admin': is_admin()
+    })
+    return render_template('usuarios.html', **context)
 
 @app.route('/editar_usuario/<int:id>', methods=['GET', 'POST'])
 @require_role('admin')
@@ -368,6 +420,11 @@ def editar_usuario(id):
         telefono = request.form['numero_telefono']
         rol = request.form['rol']
         estado = request.form['estado']
+        # Normalizar el rol
+        if rol == "Administrador":
+            rol = "admin"
+        elif rol == "Empleado":
+            rol = "empleado"
         password = request.form.get('contraseña')
         conn.execute('UPDATE usuarios SET nombre_completo = ?, correo_electronico = ?, nombre_usuario = ?, numero_telefono = ?, rol = ?, estado = ? WHERE id = ?',
                      (nombre, correo, nombre_usuario, telefono, rol, estado, id))
@@ -408,10 +465,13 @@ def informes():
         GROUP BY t.name, pp.result
     ''').fetchall()
     conn.close()
-    return render_template('informes.html',
-                           total_pacientes=total_pacientes,
-                           total_pruebas=total_pruebas,
-                           pacientes_por_estado=pacientes_por_estado)
+    context = get_user_context()
+    context.update({
+        'total_pacientes': total_pacientes,
+        'total_pruebas': total_pruebas,
+        'pacientes_por_estado': pacientes_por_estado
+    })
+    return render_template('informes.html', **context)
 
 @app.route('/informes/detalle', methods=['GET', 'POST'])
 def informes_detalle():
@@ -449,7 +509,12 @@ def informes_detalle():
                 headers={"Content-Disposition": "attachment;filename=pruebas.xlsx"}
             )
         conn.close()
-        return render_template('informes_detalle.html', pacientes=pacientes, pruebas=pruebas)
+        context = get_user_context()
+        context.update({
+            'pacientes': pacientes,
+            'pruebas': pruebas
+        })
+        return render_template('informes_detalle.html', **context)
     else:
         pacientes = conn.execute('SELECT * FROM patients').fetchall()
         pruebas = conn.execute(''' 
@@ -459,7 +524,12 @@ def informes_detalle():
             JOIN pruebas t ON pp.test_id = t.id
         ''').fetchall()
         conn.close()
-        return render_template('informes_detalle.html', pacientes=pacientes, pruebas=pruebas)
+        context = get_user_context()
+        context.update({
+            'pacientes': pacientes,
+            'pruebas': pruebas
+        })
+        return render_template('informes_detalle.html', **context)
     
 @app.route('/informes/exportar', methods=['POST'])
 def exportar_datos():

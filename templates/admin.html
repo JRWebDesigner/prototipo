@@ -1,49 +1,18 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de control</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <link rel="stylesheet" href="static/styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-    <div class="d-flex">
-        <div class="sidebar bg-primary">
-            <nav class="navbar navbar-expand-lg navbar-dark flex-column">
-                <div class="p-3 border-bottom border-light">
-                    <h5 class="text-white mb-1">{{ username }}</h5>
-                    <small class="text-white-50">Rol: {{ rol }}</small>
-                </div>
-                <ul class="navbar-nav w-100">
-                    <li class="nav-item">
-                        <a class="nav-link text-white" href="/pacientes">Pacientes</a>
-                        <a class="nav-link text-white" href="/pruebas_paciente">Pruebas Paciente</a>
-                        {% if current_user == 'admin' or rol == 'admin' %}
-                        <a class="nav-link text-white" href="/pruebas">Pruebas</a>
-                        <a class="nav-link text-white" href="/usuarios">Usuarios</a>
-                        {% endif %}
-                        <a class="nav-link text-white" href="/informes">Informes</a>
-                        <a class="nav-link text-white" href="/logout">Cerrar Sesión</a>
-                    </li>
-                </ul>
-            </nav>
-        </div>
+{% extends "base.html" %}
 
-        <div class="main-content flex-grow-1 p-4">
-            <div class="container">
-                <h1 class="display-4 text-primary">Bienvenido al Panel de Control</h1>
-                <p class="lead">Usuario: <strong>{{ username }}</strong> | Rol: <strong>{{ rol }}</strong></p>
-                
-                <canvas id="graficaEstadoAdmin" width="400" height="200"></canvas>
-                
-                <form id="add-patient-form">
-                </form>
-            </div>
-        </div>
+{% block title %}Panel de Control{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow-md p-6">
+    <h1 class="text-3xl font-bold text-gray-800 mb-4">Bienvenido al Panel de Control</h1>
+    <p class="text-gray-600 mb-6">Usuario: <strong>{{ username }}</strong> | Rol: <strong>{{ rol }}</strong></p>
+    
+    <div class="bg-gray-50 p-4 rounded-lg">
+        <canvas id="graficaEstadoAdmin" width="400" height="200"></canvas>
     </div>
+</div>
+{% endblock %}
 
-    <script src="static/script.js"></script>
-</body>
-</html>
+{% block scripts %}
+<script src="static/script.js"></script>
+{% endblock %}
