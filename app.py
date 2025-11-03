@@ -14,6 +14,35 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+def require_role(required_role=None):
+    """Decorador para verificar roles. Si required_role es None, solo requiere estar logueado."""
+    def decorator(f):
+        def decorated_function(*args, **kwargs):
+            if 'logged_in' not in session:
+                return redirect(url_for('login'))
+            
+            # Si no se especifica rol, cualquier usuario logueado puede acceder
+            if required_role is None:
+                return f(*args, **kwargs)
+            
+            # Verificar rol del usuario
+            user_rol = session.get('rol')
+            if user_rol == 'admin' or (required_role == 'empleado' and user_rol == 'empleado'):
+                return f(*args, **kwargs)
+            else:
+                return 'No tienes permisos para acceder a esta página', 403
+        decorated_function.__name__ = f.__name__
+        return decorated_function
+    return decorator
+
+def is_admin():
+    """Verifica si el usuario actual es admin"""
+    return session.get('rol') == 'admin' or session.get('username') == 'admin'
+
+def is_empleado():
+    """Verifica si el usuario actual es empleado"""
+    return session.get('rol') == 'empleado'
+
 @app.route('/')
 def home():
     if 'logged_in' in session:
@@ -30,6 +59,7 @@ def login():
         if username == 'admin' and password == 'adminarthu':
             session['logged_in'] = True
             session['username'] = 'admin'
+            session['rol'] = 'admin'
             return redirect(url_for('admin'))
         
         # Luego verificar en la base de datos
@@ -86,40 +116,51 @@ def logout():
 @app.route('/admin')
 def admin():
     if 'logged_in' in session:
-        return render_template('admin.html')
+        username = session.get('username', 'Usuario')
+        rol = session.get('rol', 'Sin rol')
+        # Obtener nombre completo si es un usuario de la BD
+        nombre_completo = username
+        if 'user_id' in session:
+            conn = get_db_connection()
+            user = conn.execute('SELECT nombre_completo FROM usuarios WHERE id = ?', (session['user_id'],)).fetchone()
+            conn.close()
+            if user:
+                nombre_completo = user['nombre_completo']
+        return render_template('admin.html', username=nombre_completo, rol=rol, current_user=session.get('username'))
     return redirect(url_for('login'))
 
 @app.route('/pacientes', methods=['GET', 'POST'])
 def pacientes():
-    if 'logged_in' in session:
-        conn = get_db_connection()
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    conn = get_db_connection()
 
-        if request.method == 'POST':
-            name = request.form['name']
-            identification_number = request.form['identification_number']
-            date_of_birth = request.form['date_of_birth']
-            gender = request.form['gender']
-            address = request.form['address']
-            phone = request.form['phone']
-            
-            conn.execute('''
-                INSERT INTO patients (name, identification_number, date_of_birth, gender, address, phone)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (name, identification_number, date_of_birth, gender, address, phone))
-            conn.commit()
-        search_name = request.args.get('search_name')
-        query = 'SELECT * FROM patients WHERE 1=1'
-        params = []
-        if search_name:
-            query += ' AND name LIKE ?'
-            params.append(f'%{search_name}%')
-        pacientes = conn.execute(query, params).fetchall()
-        conn.close()
-        return render_template('pacientes.html', pacientes=pacientes)
-    return redirect(url_for('login'))
+    if request.method == 'POST':
+        name = request.form['name']
+        identification_number = request.form['identification_number']
+        date_of_birth = request.form['date_of_birth']
+        gender = request.form['gender']
+        address = request.form['address']
+        phone = request.form['phone']
+        
+        conn.execute('''
+            INSERT INTO patients (name, identification_number, date_of_birth, gender, address, phone)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (name, identification_number, date_of_birth, gender, address, phone))
+        conn.commit()
+    search_name = request.args.get('search_name')
+    query = 'SELECT * FROM patients WHERE 1=1'
+    params = []
+    if search_name:
+        query += ' AND name LIKE ?'
+        params.append(f'%{search_name}%')
+    pacientes = conn.execute(query, params).fetchall()
+    conn.close()
+    return render_template('pacientes.html', pacientes=pacientes, is_admin=is_admin())
 
 
 @app.route('/editar_paciente/<int:id>', methods=['GET', 'POST'])
+@require_role('admin')
 def editar_paciente(id):
     conn = get_db_connection()
     paciente = conn.execute('SELECT * FROM patients WHERE id = ?', (id,)).fetchone()
@@ -142,6 +183,7 @@ def editar_paciente(id):
     return render_template('editar_paciente.html', paciente=paciente)
 
 @app.route('/eliminar_paciente/<int:id>')
+@require_role('admin')
 def eliminar_paciente(id):
     conn = get_db_connection()
     conn.execute('DELETE FROM patients WHERE id = ?', (id,))
@@ -151,6 +193,8 @@ def eliminar_paciente(id):
 
 @app.route('/pruebas_paciente', methods=['GET', 'POST'])
 def pruebas_paciente():
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
     conn = get_db_connection()
     if request.method == 'POST':
         patient_id = request.form['patient_id']
@@ -186,8 +230,9 @@ def pruebas_paciente():
         params.append(f'%{search_name}%')
     pruebas_paciente = conn.execute(query, params).fetchall()
     conn.close()
-    return render_template('pruebas_paciente.html', pacientes=pacientes, pruebas=pruebas, pruebas_paciente=pruebas_paciente)
+    return render_template('pruebas_paciente.html', pacientes=pacientes, pruebas=pruebas, pruebas_paciente=pruebas_paciente, is_admin=is_admin())
 @app.route('/editar_prueba_paciente/<int:id>', methods=['GET', 'POST'])
+@require_role('admin')
 def editar_prueba_paciente(id):
     conn = get_db_connection()
     prueba = conn.execute('SELECT * FROM pruebas_paciente WHERE id = ?', (id,)).fetchone()
@@ -212,6 +257,7 @@ def editar_prueba_paciente(id):
     return render_template('editar_prueba_paciente.html', prueba=prueba, pacientes=pacientes, pruebas=pruebas)
 
 @app.route('/eliminar_prueba_paciente/<int:id>')
+@require_role('admin')
 def eliminar_prueba_paciente(id):
     conn = get_db_connection()
     conn.execute('DELETE FROM pruebas_paciente WHERE id = ?', (id,))
@@ -220,6 +266,7 @@ def eliminar_prueba_paciente(id):
     return redirect(url_for('pruebas_paciente'))
 
 @app.route('/pruebas', methods=['GET', 'POST'])
+@require_role('admin')
 def pruebas():
     conn = get_db_connection()
     
@@ -242,9 +289,10 @@ def pruebas():
         params.append(f'%{search_name}%')
     pruebas = conn.execute(query, params).fetchall()
     conn.close()
-    return render_template('pruebas.html', pruebas=pruebas)
+    return render_template('pruebas.html', pruebas=pruebas, is_admin=is_admin())
 
 @app.route('/editar_prueba/<int:id>', methods=['GET', 'POST'])
+@require_role('admin')
 def editar_prueba(id):
     conn = get_db_connection()
     prueba = conn.execute('SELECT * FROM pruebas WHERE id = ?', (id,)).fetchone()
@@ -268,6 +316,7 @@ def editar_prueba(id):
     return render_template('editar_prueba.html', prueba=prueba)
 
 @app.route('/eliminar_prueba/<int:id>')
+@require_role('admin')
 def eliminar_prueba(id):
     conn = get_db_connection()
     conn.execute('DELETE FROM pruebas WHERE id = ?', (id,))
@@ -276,6 +325,7 @@ def eliminar_prueba(id):
     return redirect(url_for('pruebas'))
 
 @app.route('/usuarios', methods=['GET', 'POST'])
+@require_role('admin')
 def usuarios():
     conn = get_db_connection()
     if request.method == 'POST':
@@ -304,9 +354,10 @@ def usuarios():
         params.append(f'%{search_name}%')
     usuarios = conn.execute(query, params).fetchall()
     conn.close()
-    return render_template('usuarios.html', usuarios=usuarios)
+    return render_template('usuarios.html', usuarios=usuarios, is_admin=is_admin())
 
 @app.route('/editar_usuario/<int:id>', methods=['GET', 'POST'])
+@require_role('admin')
 def editar_usuario(id):
     conn = get_db_connection()
     user = conn.execute('SELECT * FROM usuarios WHERE id = ?', (id,)).fetchone()
@@ -334,6 +385,7 @@ def editar_usuario(id):
     return render_template('editar_usuario.html', user=user)
 
 @app.route('/eliminar_usuario/<int:id>')
+@require_role('admin')
 def eliminar_usuario(id):
     conn = get_db_connection()
     conn.execute('DELETE FROM usuarios WHERE id = ?', (id,))

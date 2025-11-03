@@ -95,8 +95,12 @@
                             <td>{{ prueba.duration }}</td>
                             <td>{{ prueba.status }}</td>
                             <td>
+                                {% if is_admin %}
                                 <a href="{{ url_for('editar_prueba', id=prueba.id) }}" class="btn btn-warning btn-sm">Editar</a>
                                 <a href="{{ url_for('eliminar_prueba', id=prueba.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de que deseas eliminar esta prueba?');">Eliminar</a>
+                                {% else %}
+                                <span class="text-muted">Solo lectura</span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}

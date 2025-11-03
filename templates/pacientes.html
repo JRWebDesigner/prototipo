@@ -11,6 +11,7 @@
     <div class="container-fluid mt-5">
         <div class="card p-4 mx-auto" style="max-width: 1300px;">
             <div class="card-body">
+                {% if is_admin %}
                 <h2 class="text-center mb-4">Añadir Datos Personales</h2>
                 <form method="POST" action="/pacientes">
                     <div class="form-group">
@@ -49,6 +50,10 @@
 
                     <button type="submit" class="btn btn-success btn-block">Agregar Paciente</button>
                 </form>
+                {% else %}
+                <h2 class="text-center mb-4">Lista de Pacientes</h2>
+                <p class="text-muted text-center">Solo lectura - No tienes permisos para agregar pacientes</p>
+                {% endif %}
 
                 <h2 class="text-center mt-5 mb-4">Lista de Pacientes</h2>
                 <div class="form-row">
@@ -85,10 +90,14 @@
                                 <td>{{ paciente['address'] }}</td>
                                 <td>{{ paciente['phone'] }}</td>
                                 <td>
+                                    {% if is_admin %}
                                     <div class="d-flex justify-content-around">
                                         <a href="{{ url_for('editar_paciente', id=paciente.id) }}" class="btn btn-warning btn-sm">Editar</a>
                                         <a href="{{ url_for('eliminar_paciente', id=paciente.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de que deseas eliminar este paciente?');">Eliminar</a>
                                     </div>
+                                    {% else %}
+                                    <span class="text-muted">Solo lectura</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
