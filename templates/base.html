@@ -10,10 +10,10 @@
 <body class="bg-gray-50">
     <div class="flex h-screen">
         <!-- Sidebar -->
-        <aside class="w-64 bg-blue-700 text-white flex flex-col">
+        <aside class="w-64 bg-blue-950 text-white flex flex-col">
             <!-- User Info -->
             <div class="p-4 border-b border-blue-600">
-                <h3 class="font-bold text-lg mb-1">{{ username }}</h3>
+                <h3 class="font-bold text-lg mb-1 uppercase">{{ username }}</h3>
                 <p class="text-blue-200 text-sm">Rol: {{ rol }}</p>
             </div>
             
@@ -62,7 +62,7 @@
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 overflow-y-auto">
+        <main class="flex-1 overflow-y-auto bg-[url('https://img.freepik.com/vector-gratis/antecedentes-laboratorios-ciencias-futuristas_23-2148505015.jpg?semt=ais_hybrid&w=740&q=80')] bg-cover bg-center">
             <div class="p-6">
                 {% block content %}{% endblock %}
             </div>
