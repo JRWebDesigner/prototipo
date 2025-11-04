@@ -450,9 +450,11 @@ def eliminar_usuario(id):
     conn.close()
     return redirect(url_for('usuarios'))
 
-@app.route('/informes', methods=['GET'])
+@app.route('/informes', methods=['GET', 'POST'])
 def informes():
     conn = get_db_connection()
+    
+    # Obtener datos de resumen
     total_pacientes = conn.execute('SELECT COUNT(*) FROM patients').fetchone()[0]
     total_pruebas = conn.execute('SELECT COUNT(*) FROM pruebas_paciente').fetchone()[0]
     pacientes_por_estado = conn.execute('''
@@ -464,15 +466,63 @@ def informes():
         JOIN pruebas t ON pp.test_id = t.id
         GROUP BY t.name, pp.result
     ''').fetchall()
+    
+    # Obtener todos los pacientes y pruebas para las tablas
+    pacientes = conn.execute('SELECT * FROM patients').fetchall()
+    pruebas = conn.execute(''' 
+        SELECT pp.id, p.name AS patient_name, t.name AS test_name, t.code, pp.test_date, pp.result, pp.result_date, pp.laboratory
+        FROM pruebas_paciente pp
+        JOIN patients p ON pp.patient_id = p.id
+        JOIN pruebas t ON pp.test_id = t.id
+    ''').fetchall()
+    
+    # Manejar búsqueda si se envió el formulario
+    search_query = None
+    if request.method == 'POST':
+        search_query = request.form.get('search_query', '')
+        
+        if search_query:
+            # Buscar pacientes que coincidan con la consulta
+            pacientes = conn.execute(
+                'SELECT * FROM patients WHERE name LIKE ? OR identification_number LIKE ?',
+                ('%' + search_query + '%', '%' + search_query + '%')
+            ).fetchall()
+            
+            # Buscar pruebas relacionadas con pacientes que coincidan
+            pruebas = conn.execute(''' 
+                SELECT pp.id, p.name AS patient_name, t.name AS test_name, t.code, pp.test_date, pp.result, pp.result_date, pp.laboratory
+                FROM pruebas_paciente pp
+                JOIN patients p ON pp.patient_id = p.id
+                JOIN pruebas t ON pp.test_id = t.id
+                WHERE p.name LIKE ? OR p.identification_number LIKE ? OR t.name LIKE ?
+            ''', ('%' + search_query + '%', '%' + search_query + '%', '%' + search_query + '%')).fetchall()
+        
+        # Manejar exportación a Excel
+        if 'export_excel' in request.form:
+            df = pd.DataFrame(pruebas, columns=['id', 'patient_name', 'test_name', 'code', 'test_date', 'result', 'result_date', 'laboratory'])
+            df = df.drop(columns=['id'])
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Pruebas')
+            output.seek(0)
+            conn.close()
+            return Response(
+                output,
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": "attachment;filename=pruebas.xlsx"}
+            )
+    
     conn.close()
     context = get_user_context()
     context.update({
         'total_pacientes': total_pacientes,
         'total_pruebas': total_pruebas,
-        'pacientes_por_estado': pacientes_por_estado
+        'pacientes_por_estado': pacientes_por_estado,
+        'pacientes': pacientes,
+        'pruebas': pruebas,
+        'search_query': search_query
     })
     return render_template('informes.html', **context)
-
 @app.route('/informes/detalle', methods=['GET', 'POST'])
 def informes_detalle():
     conn = get_db_connection()
