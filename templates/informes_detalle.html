@@ -43,9 +43,8 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-blue-600">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">ID</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Nombre</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Identificación</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Carnet de Identidad</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Fecha Nacimiento</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Género</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Dirección</th>
@@ -55,9 +54,6 @@
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for paciente in pacientes %}
                     <tr class="hover:bg-blue-50 transition-colors">
-                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                            <span class="bg-gray-100 text-gray-800 px-2 py-1 rounded">{{ paciente.id }}</span>
-                        </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{{ paciente.name }}</td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{{ paciente.identification_number }}</td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ paciente.date_of_birth }}</td>
