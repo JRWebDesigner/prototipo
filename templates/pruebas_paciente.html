@@ -106,21 +106,25 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ prueba.result_date }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ prueba.laboratory }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            {% if is_admin %}
-                            <div class="flex gap-2">
+                            <div class="flex gap-2 flex-wrap">
+                                <!-- Botón para descargar PDF (disponible para todos) -->
+                                <a href="{{ url_for('descargar_reporte', prueba_id=prueba.id) }}" 
+                                   class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition-colors text-xs"
+                                   title="Descargar reporte PDF">
+                                    📄 PDF
+                                </a>
+                                {% if is_admin %}
                                 <a href="{{ url_for('editar_prueba_paciente', id=prueba.id) }}" 
-                                   class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition-colors">
+                                   class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition-colors text-xs">
                                     Editar
                                 </a>
                                 <a href="{{ url_for('eliminar_prueba_paciente', id=prueba.id) }}" 
                                    onclick="return confirm('¿Estás seguro de que deseas eliminar esta prueba?');"
-                                   class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition-colors">
+                                   class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition-colors text-xs">
                                     Eliminar
                                 </a>
+                                {% endif %}
                             </div>
-                            {% else %}
-                            <span class="text-gray-400">Solo lectura</span>
-                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

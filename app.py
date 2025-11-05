@@ -5,6 +5,7 @@ import pandas as pd
 from io import BytesIO, StringIO
 import xlsxwriter
 from fpdf import FPDF
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -301,6 +302,39 @@ def eliminar_prueba_paciente(id):
     conn.commit()
     conn.close()
     return redirect(url_for('pruebas_paciente'))
+
+@app.route('/descargar_reporte/<int:prueba_id>')
+def descargar_reporte(prueba_id):
+    """Ruta pública para descargar el reporte PDF de una prueba específica (sin necesidad de login)"""
+    buffer = generar_reporte_prueba_pdf(prueba_id)
+    
+    if buffer is None:
+        return "Prueba no encontrada", 404
+    
+    # Obtener nombre del archivo basado en la prueba
+    conn = get_db_connection()
+    prueba_info = conn.execute('''
+        SELECT p.name, pp.test_date, t.name AS test_name
+        FROM pruebas_paciente pp
+        JOIN patients p ON pp.patient_id = p.id
+        JOIN pruebas t ON pp.test_id = t.id
+        WHERE pp.id = ?
+    ''', (prueba_id,)).fetchone()
+    conn.close()
+    
+    if prueba_info:
+        # Nombre del archivo: NombrePaciente_FechaPrueba_NombrePrueba.pdf
+        nombre_archivo = f"{prueba_info['name'].replace(' ', '_')}_{prueba_info['test_date']}_{prueba_info['test_name'].replace(' ', '_')}.pdf"
+        nombre_archivo = nombre_archivo.replace('/', '_')  # Reemplazar / en fechas
+    else:
+        nombre_archivo = f"reporte_prueba_{prueba_id}.pdf"
+    
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=nombre_archivo,
+        mimetype='application/pdf'
+    )
 
 @app.route('/pruebas', methods=['GET', 'POST'])
 @require_role('admin')
@@ -612,25 +646,50 @@ def exportar_datos():
 
 @app.route('/informacion', methods=['GET', 'POST'])
 def informacion():
+    """Ruta pública para consultar información de pruebas sin necesidad de login"""
     conn = get_db_connection()
     resultados = []
+    pruebas_completas = []  # Para tener acceso a los IDs de pruebas_paciente
+    
     if request.method == 'POST':
-        nombre = request.form.get('nombre')
-        carnet = request.form.get('carnet')
+        nombre = request.form.get('nombre') or ''
+        carnet = request.form.get('carnet') or ''
+        
+        # Query mejorada para obtener más información y el ID de pruebas_paciente
         query = '''
-        SELECT p.id, p.name, p.identification_number, pp.test_id, pp.test_date, pp.result
+        SELECT 
+            pp.id AS prueba_paciente_id,
+            p.id AS patient_id,
+            p.name,
+            p.identification_number,
+            pp.test_id,
+            pp.test_date,
+            pp.result,
+            pp.result_date,
+            pp.laboratory,
+            t.name AS test_name,
+            t.code AS test_code
         FROM patients p
         JOIN pruebas_paciente pp ON p.id = pp.patient_id
+        JOIN pruebas t ON pp.test_id = t.id
         WHERE p.name LIKE ? AND p.identification_number LIKE ?
+        ORDER BY pp.test_date DESC
         '''
         params = [f'%{nombre}%', f'%{carnet}%']
-        df = pd.read_sql_query(query, conn, params=params)
-        resultados = df.to_dict(orient='records')
+        
+        pruebas_completas = conn.execute(query, params).fetchall()
+        resultados = [dict(row) for row in pruebas_completas]
         conn.close()
-        if 'export_pdf' in request.form:
-            return exportar_pdf(resultados)
-        return render_template('informacion.html', resultados=resultados)
-    return render_template('informacion.html')
+        
+        return render_template('informacion.html', 
+                             resultados=resultados,
+                             pruebas_completas=pruebas_completas,
+                             nombre_busqueda=nombre,
+                             carnet_busqueda=carnet,
+                             is_public=True)
+    
+    conn.close()
+    return render_template('informacion.html', is_public=True)
 
 def export_to_excel_func():
     conn = get_db_connection()
@@ -674,6 +733,146 @@ def exportar_pdf(resultados):
     pdf.output(buffer)
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name='informe_pruebas.pdf', mimetype='application/pdf')
+
+def generar_reporte_prueba_pdf(prueba_id):
+    """Genera un PDF profesional para una prueba específica de un paciente"""
+    conn = get_db_connection()
+    
+    # Obtener información completa de la prueba
+    prueba_data = conn.execute('''
+        SELECT 
+            pp.id AS prueba_id,
+            pp.test_date,
+            pp.result,
+            pp.result_date,
+            pp.laboratory,
+            p.id AS patient_id,
+            p.name AS patient_name,
+            p.identification_number,
+            p.date_of_birth,
+            p.gender,
+            p.address,
+            p.phone,
+            t.id AS test_id,
+            t.name AS test_name,
+            t.code AS test_code,
+            t.description AS test_description,
+            t.category AS test_category,
+            t.method AS test_method
+        FROM pruebas_paciente pp
+        JOIN patients p ON pp.patient_id = p.id
+        JOIN pruebas t ON pp.test_id = t.id
+        WHERE pp.id = ?
+    ''', (prueba_id,)).fetchone()
+    
+    conn.close()
+    
+    if not prueba_data:
+        return None
+    
+    # Crear PDF
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Configuración de fuentes y colores
+    pdf.set_fill_color(59, 130, 246)  # Azul
+    pdf.set_text_color(255, 255, 255)
+    
+    # Encabezado
+    pdf.set_font('Arial', 'B', 20)
+    pdf.cell(0, 15, 'REPORTE DE PRUEBA MÉDICA', 0, 1, 'C', True)
+    pdf.ln(10)
+    
+    # Información del paciente
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Arial', 'B', 16)
+    pdf.cell(0, 10, 'INFORMACIÓN DEL PACIENTE', 0, 1, 'L')
+    pdf.set_line_width(0.5)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(5)
+    
+    pdf.set_font('Arial', '', 11)
+    pdf.set_fill_color(245, 247, 250)
+    pdf.set_text_color(0, 0, 0)
+    
+    # Datos del paciente en formato tabla
+    datos_paciente = [
+        ('Nombre Completo:', prueba_data['patient_name']),
+        ('Número de Identificación:', prueba_data['identification_number']),
+        ('Fecha de Nacimiento:', prueba_data['date_of_birth']),
+        ('Género:', prueba_data['gender']),
+        ('Dirección:', prueba_data['address']),
+        ('Teléfono:', prueba_data['phone'])
+    ]
+    
+    for etiqueta, valor in datos_paciente:
+        pdf.set_font('Arial', 'B', 10)
+        pdf.cell(60, 8, etiqueta, 0, 0, 'L')
+        pdf.set_font('Arial', '', 10)
+        pdf.cell(0, 8, str(valor), 0, 1, 'L')
+        pdf.ln(2)
+    
+    pdf.ln(5)
+    
+    # Información de la prueba
+    pdf.set_font('Arial', 'B', 16)
+    pdf.cell(0, 10, 'DETALLES DE LA PRUEBA', 0, 1, 'L')
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(5)
+    
+    pdf.set_font('Arial', '', 11)
+    
+    # Datos de la prueba
+    datos_prueba = [
+        ('Nombre de la Prueba:', prueba_data['test_name']),
+        ('Código de Prueba:', prueba_data['test_code']),
+        ('Categoría:', prueba_data['test_category']),
+        ('Método:', prueba_data['test_method']),
+        ('Descripción:', prueba_data['test_description']),
+        ('Fecha de Realización:', prueba_data['test_date']),
+        ('Fecha de Resultado:', prueba_data['result_date']),
+        ('Laboratorio:', prueba_data['laboratory'])
+    ]
+    
+    for etiqueta, valor in datos_prueba:
+        pdf.set_font('Arial', 'B', 10)
+        pdf.cell(60, 8, etiqueta, 0, 0, 'L')
+        pdf.set_font('Arial', '', 10)
+        # Manejar texto largo
+        if len(str(valor)) > 50 and etiqueta in ['Descripción:', 'Dirección:']:
+            pdf.multi_cell(0, 8, str(valor), 0, 'L')
+        else:
+            pdf.cell(0, 8, str(valor), 0, 1, 'L')
+        pdf.ln(2)
+    
+    pdf.ln(5)
+    
+    # Resultado destacado
+    pdf.set_font('Arial', 'B', 16)
+    pdf.cell(0, 10, 'RESULTADO', 0, 1, 'L')
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(5)
+    
+    # Resultado con fondo de color
+    resultado = prueba_data['result']
+    pdf.set_fill_color(59, 130, 246)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Arial', 'B', 14)
+    pdf.cell(0, 12, resultado.upper(), 0, 1, 'C', True)
+    pdf.ln(10)
+    
+    # Pie de página
+    pdf.set_text_color(128, 128, 128)
+    pdf.set_font('Arial', 'I', 8)
+    pdf.cell(0, 5, f'Reporte generado el: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}', 0, 1, 'C')
+    pdf.cell(0, 5, f'ID de Prueba: {prueba_id} | ID de Paciente: {prueba_data["patient_id"]}', 0, 1, 'C')
+    
+    # Generar buffer
+    buffer = BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    
+    return buffer
 
 if __name__ == '__main__':
     app.run(debug=True)
