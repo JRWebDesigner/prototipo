@@ -14,7 +14,7 @@
             </a>
         </div>
 
-        <!-- Barra de búsqueda y exportación -->
+        <!-- Barra de búsqueda -->
         <form method="post" class="flex gap-2 mb-4">
             <input type="text" name="search_query" 
                    placeholder="Buscar por nombre o identificación..." 
@@ -23,10 +23,6 @@
                     class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors">
                 🔍 Buscar
             </button>
-            <button type="submit" name="export_excel" 
-                    class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors">
-                📊 Exportar a Excel
-            </button>
         </form>
     </div>
 
@@ -34,9 +30,15 @@
     <div class="bg-white rounded-lg shadow-md p-6">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-2xl font-semibold text-gray-800">👥 Pacientes</h3>
-            <span class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-1 rounded-full">
-                Total: {{ pacientes|length }}
-            </span>
+            <div class="flex items-center gap-3">
+                <span class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-1 rounded-full">
+                    Total: {{ pacientes|length }}
+                </span>
+                <a href="{{ url_for('exportar_pacientes_pdf') }}" 
+                   class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-2">
+                    📄 Exportar PDF
+                </a>
+            </div>
         </div>
         
         <div class="overflow-x-auto">
@@ -82,9 +84,15 @@
     <div class="bg-white rounded-lg shadow-md p-6">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-2xl font-semibold text-gray-800">🔬 Pruebas de Pacientes</h3>
-            <span class="bg-green-100 text-green-800 text-sm font-semibold px-3 py-1 rounded-full">
-                Total: {{ pruebas|length }}
-            </span>
+            <div class="flex items-center gap-3">
+                <span class="bg-green-100 text-green-800 text-sm font-semibold px-3 py-1 rounded-full">
+                    Total: {{ pruebas|length }}
+                </span>
+                <a href="{{ url_for('exportar_pruebas_pdf') }}" 
+                   class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-2">
+                    📄 Exportar PDF
+                </a>
+            </div>
         </div>
         
         <div class="overflow-x-auto">

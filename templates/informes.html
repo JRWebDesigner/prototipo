@@ -18,35 +18,40 @@
     <!-- Resumen de Datos -->
     <div class="bg-white rounded-lg shadow-md p-6">
 
-        <!-- Tabla de Resumen por Estado -->
-        <h4 class="text-xl font-semibold text-gray-800 mb-4">Pacientes por Estado de Pruebas</h4>
+        <!-- Tabla de Resumen por Categoría de Pruebas -->
+        <h4 class="text-xl font-semibold text-gray-800 mb-4">Conteo de Pruebas por Categoría</h4>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-purple-600">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Tipo de Prueba</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Resultado</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Cantidad de Pacientes</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Categoría de Prueba</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Total de Pruebas</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for estado in pacientes_por_estado %}
                     <tr class="hover:bg-purple-50 transition-colors">
                         <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{{ estado.tipo_prueba }}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{{ estado.result }}</td>
                         <td class="px-4 py-3 whitespace-nowrap">
-                            <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-semibold">
-                                {{ estado.cantidad }}
+                            <span class="bg-purple-100 text-purple-800 px-4 py-2 rounded-full text-sm font-bold">
+                                {{ estado.cantidad }} prueba(s)
                             </span>
                         </td>
                     </tr>
                     {% endfor %}
+                    {% if not pacientes_por_estado %}
+                    <tr>
+                        <td colspan="2" class="px-4 py-8 text-center text-gray-500">
+                            <p>No hay pruebas registradas en las categorías (Anticuerpos, Antígeno, PCR)</p>
+                        </td>
+                    </tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
     </div>
 
-    <!-- Barra de búsqueda y exportación -->
+    <!-- Barra de búsqueda -->
     <div class="bg-white rounded-lg shadow-md p-6">
         <form method="post" class="flex gap-2">
             <input type="text" name="search_query" 
@@ -57,10 +62,6 @@
                     class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors">
                 🔍 Buscar
             </button>
-            <button type="submit" name="export_excel" 
-                    class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors">
-                📊 Exportar a Excel
-            </button>
         </form>
     </div>
 
@@ -68,9 +69,15 @@
     <div class="bg-white rounded-lg shadow-md p-6">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-2xl font-semibold text-gray-800">👥 Pacientes</h3>
-            <span class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-1 rounded-full">
-                Total: {{ pacientes|length }}
-            </span>
+            <div class="flex items-center gap-3">
+                <span class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-1 rounded-full">
+                    Total: {{ pacientes|length }}
+                </span>
+                <a href="{{ url_for('exportar_pacientes_pdf') }}" 
+                   class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-2">
+                    📄 Exportar PDF
+                </a>
+            </div>
         </div>
         
         <div class="overflow-x-auto">
@@ -116,9 +123,15 @@
     <div class="bg-white rounded-lg shadow-md p-6">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-2xl font-semibold text-gray-800">🔬 Pruebas de Pacientes</h3>
-            <span class="bg-green-100 text-green-800 text-sm font-semibold px-3 py-1 rounded-full">
-                Total: {{ pruebas|length }}
-            </span>
+            <div class="flex items-center gap-3">
+                <span class="bg-green-100 text-green-800 text-sm font-semibold px-3 py-1 rounded-full">
+                    Total: {{ pruebas|length }}
+                </span>
+                <a href="{{ url_for('exportar_pruebas_pdf') }}" 
+                   class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-2">
+                    📄 Exportar PDF
+                </a>
+            </div>
         </div>
         
         <div class="overflow-x-auto">

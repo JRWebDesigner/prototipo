@@ -491,14 +491,17 @@ def informes():
     # Obtener datos de resumen
     total_pacientes = conn.execute('SELECT COUNT(*) FROM patients').fetchone()[0]
     total_pruebas = conn.execute('SELECT COUNT(*) FROM pruebas_paciente').fetchone()[0]
+    
+    # Contar pruebas por categoría (solo Anticuerpos, Antígeno y PCR)
     pacientes_por_estado = conn.execute('''
         SELECT 
             t.name AS tipo_prueba,
-            pp.result,
             COUNT(pp.id) AS cantidad
         FROM pruebas_paciente pp
         JOIN pruebas t ON pp.test_id = t.id
-        GROUP BY t.name, pp.result
+        WHERE t.name IN ('Anticuerpos', 'Antígeno', 'PCR')
+        GROUP BY t.name
+        ORDER BY t.name
     ''').fetchall()
     
     # Obtener todos los pacientes y pruebas para las tablas
@@ -530,21 +533,6 @@ def informes():
                 JOIN pruebas t ON pp.test_id = t.id
                 WHERE p.name LIKE ? OR p.identification_number LIKE ? OR t.name LIKE ?
             ''', ('%' + search_query + '%', '%' + search_query + '%', '%' + search_query + '%')).fetchall()
-        
-        # Manejar exportación a Excel
-        if 'export_excel' in request.form:
-            df = pd.DataFrame(pruebas, columns=['id', 'patient_name', 'test_name', 'code', 'test_date', 'result', 'result_date', 'laboratory'])
-            df = df.drop(columns=['id'])
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False, sheet_name='Pruebas')
-            output.seek(0)
-            conn.close()
-            return Response(
-                output,
-                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={"Content-Disposition": "attachment;filename=pruebas.xlsx"}
-            )
     
     conn.close()
     context = get_user_context()
@@ -873,6 +861,226 @@ def generar_reporte_prueba_pdf(prueba_id):
     buffer.seek(0)
     
     return buffer
+
+def generar_pdf_pacientes_detallado():
+    """Genera un PDF detallado con todos los pacientes"""
+    conn = get_db_connection()
+    pacientes = conn.execute('SELECT * FROM patients ORDER BY name').fetchall()
+    conn.close()
+    
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Encabezado
+    pdf.set_fill_color(59, 130, 246)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Arial', 'B', 20)
+    pdf.cell(0, 15, 'REPORTE DETALLADO DE PACIENTES', 0, 1, 'C', True)
+    pdf.ln(10)
+    
+    # Información general
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, f'Total de Pacientes: {len(pacientes)}', 0, 1, 'L')
+    pdf.ln(5)
+    
+    # Tabla de pacientes
+    pdf.set_font('Arial', 'B', 10)
+    pdf.set_fill_color(200, 200, 200)
+    
+    # Encabezados de tabla
+    pdf.cell(40, 10, 'ID', 1, 0, 'C', True)
+    pdf.cell(60, 10, 'Nombre', 1, 0, 'C', True)
+    pdf.cell(40, 10, 'Identificación', 1, 0, 'C', True)
+    pdf.cell(30, 10, 'Fecha Nac.', 1, 0, 'C', True)
+    pdf.cell(25, 10, 'Género', 1, 1, 'C', True)
+    
+    pdf.set_font('Arial', '', 9)
+    pdf.set_fill_color(255, 255, 255)
+    
+    for paciente in pacientes:
+        # Verificar si necesitamos nueva página
+        if pdf.get_y() > 270:
+            pdf.add_page()
+            # Repetir encabezados
+            pdf.set_font('Arial', 'B', 10)
+            pdf.set_fill_color(200, 200, 200)
+            pdf.cell(40, 10, 'ID', 1, 0, 'C', True)
+            pdf.cell(60, 10, 'Nombre', 1, 0, 'C', True)
+            pdf.cell(40, 10, 'Identificación', 1, 0, 'C', True)
+            pdf.cell(30, 10, 'Fecha Nac.', 1, 0, 'C', True)
+            pdf.cell(25, 10, 'Género', 1, 1, 'C', True)
+            pdf.set_font('Arial', '', 9)
+            pdf.set_fill_color(255, 255, 255)
+        
+        pdf.cell(40, 8, str(paciente['id']), 1, 0, 'C')
+        pdf.cell(60, 8, paciente['name'][:28], 1, 0, 'L')  # Limitar longitud
+        pdf.cell(40, 8, paciente['identification_number'], 1, 0, 'C')
+        pdf.cell(30, 8, paciente['date_of_birth'], 1, 0, 'C')
+        pdf.cell(25, 8, paciente['gender'][:8], 1, 1, 'C')
+    
+    # Agregar segunda tabla con información adicional
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 16)
+    pdf.cell(0, 10, 'INFORMACIÓN ADICIONAL DE PACIENTES', 0, 1, 'L')
+    pdf.ln(5)
+    
+    pdf.set_font('Arial', 'B', 10)
+    pdf.set_fill_color(200, 200, 200)
+    pdf.cell(40, 10, 'ID', 1, 0, 'C', True)
+    pdf.cell(80, 10, 'Nombre', 1, 0, 'C', True)
+    pdf.cell(70, 10, 'Dirección', 1, 1, 'C', True)
+    
+    pdf.set_font('Arial', '', 9)
+    pdf.set_fill_color(255, 255, 255)
+    
+    for paciente in pacientes:
+        if pdf.get_y() > 270:
+            pdf.add_page()
+            pdf.set_font('Arial', 'B', 10)
+            pdf.set_fill_color(200, 200, 200)
+            pdf.cell(40, 10, 'ID', 1, 0, 'C', True)
+            pdf.cell(80, 10, 'Nombre', 1, 0, 'C', True)
+            pdf.cell(70, 10, 'Dirección', 1, 1, 'C', True)
+            pdf.set_font('Arial', '', 9)
+            pdf.set_fill_color(255, 255, 255)
+        
+        pdf.cell(40, 8, str(paciente['id']), 1, 0, 'C')
+        pdf.cell(80, 8, paciente['name'][:35], 1, 0, 'L')
+        # Dirección puede ser larga, usar multi_cell si es necesario
+        direccion = paciente['address'][:30] if len(paciente['address']) <= 30 else paciente['address'][:27] + '...'
+        pdf.cell(70, 8, direccion, 1, 1, 'L')
+    
+    # Pie de página
+    pdf.set_text_color(128, 128, 128)
+    pdf.set_font('Arial', 'I', 8)
+    pdf.cell(0, 5, f'Reporte generado el: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}', 0, 1, 'C')
+    
+    buffer = BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    return buffer
+
+def generar_pdf_pruebas_detallado():
+    """Genera un PDF detallado con todas las pruebas de pacientes"""
+    conn = get_db_connection()
+    pruebas = conn.execute(''' 
+        SELECT 
+            pp.id,
+            p.name AS patient_name,
+            p.identification_number,
+            t.name AS test_name,
+            t.code AS test_code,
+            pp.test_date,
+            pp.result,
+            pp.result_date,
+            pp.laboratory,
+            t.description AS test_description,
+            t.category AS test_category
+        FROM pruebas_paciente pp
+        JOIN patients p ON pp.patient_id = p.id
+        JOIN pruebas t ON pp.test_id = t.id
+        ORDER BY pp.test_date DESC
+    ''').fetchall()
+    conn.close()
+    
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Encabezado
+    pdf.set_fill_color(34, 197, 94)  # Verde
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Arial', 'B', 20)
+    pdf.cell(0, 15, 'REPORTE DETALLADO DE PRUEBAS', 0, 1, 'C', True)
+    pdf.ln(10)
+    
+    # Información general
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, f'Total de Pruebas: {len(pruebas)}', 0, 1, 'L')
+    pdf.ln(5)
+    
+    # Tabla principal
+    pdf.set_font('Arial', 'B', 9)
+    pdf.set_fill_color(200, 200, 200)
+    
+    # Encabezados
+    pdf.cell(30, 8, 'Paciente', 1, 0, 'C', True)
+    pdf.cell(35, 8, 'Prueba', 1, 0, 'C', True)
+    pdf.cell(25, 8, 'Código', 1, 0, 'C', True)
+    pdf.cell(30, 8, 'Fecha Prueba', 1, 0, 'C', True)
+    pdf.cell(30, 8, 'Resultado', 1, 0, 'C', True)
+    pdf.cell(30, 8, 'Laboratorio', 1, 1, 'C', True)
+    
+    pdf.set_font('Arial', '', 8)
+    pdf.set_fill_color(255, 255, 255)
+    
+    for prueba in pruebas:
+        if pdf.get_y() > 270:
+            pdf.add_page()
+            pdf.set_font('Arial', 'B', 9)
+            pdf.set_fill_color(200, 200, 200)
+            pdf.cell(30, 8, 'Paciente', 1, 0, 'C', True)
+            pdf.cell(35, 8, 'Prueba', 1, 0, 'C', True)
+            pdf.cell(25, 8, 'Código', 1, 0, 'C', True)
+            pdf.cell(30, 8, 'Fecha Prueba', 1, 0, 'C', True)
+            pdf.cell(30, 8, 'Resultado', 1, 0, 'C', True)
+            pdf.cell(30, 8, 'Laboratorio', 1, 1, 'C', True)
+            pdf.set_font('Arial', '', 8)
+            pdf.set_fill_color(255, 255, 255)
+        
+        paciente = prueba['patient_name'][:20] if len(prueba['patient_name']) <= 20 else prueba['patient_name'][:17] + '...'
+        prueba_nombre = prueba['test_name'][:20] if len(prueba['test_name']) <= 20 else prueba['test_name'][:17] + '...'
+        laboratorio = prueba['laboratory'][:20] if len(prueba['laboratory']) <= 20 else prueba['laboratory'][:17] + '...'
+        
+        pdf.cell(30, 8, paciente, 1, 0, 'L')
+        pdf.cell(35, 8, prueba_nombre, 1, 0, 'L')
+        pdf.cell(25, 8, prueba['test_code'], 1, 0, 'C')
+        pdf.cell(30, 8, prueba['test_date'], 1, 0, 'C')
+        pdf.cell(30, 8, prueba['result'][:15], 1, 0, 'C')
+        pdf.cell(30, 8, laboratorio, 1, 1, 'L')
+    
+    # Pie de página
+    pdf.set_text_color(128, 128, 128)
+    pdf.set_font('Arial', 'I', 8)
+    pdf.cell(0, 5, f'Reporte generado el: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}', 0, 1, 'C')
+    
+    buffer = BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    return buffer
+
+@app.route('/exportar_pacientes_pdf')
+def exportar_pacientes_pdf():
+    """Ruta para exportar todos los pacientes en PDF"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    buffer = generar_pdf_pacientes_detallado()
+    nombre_archivo = f"reporte_pacientes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=nombre_archivo,
+        mimetype='application/pdf'
+    )
+
+@app.route('/exportar_pruebas_pdf')
+def exportar_pruebas_pdf():
+    """Ruta para exportar todas las pruebas en PDF"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    buffer = generar_pdf_pruebas_detallado()
+    nombre_archivo = f"reporte_pruebas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=nombre_archivo,
+        mimetype='application/pdf'
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
