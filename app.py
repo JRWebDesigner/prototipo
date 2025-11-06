@@ -123,7 +123,7 @@ def login():
                 session['username'] = username
                 session['user_id'] = user['id']
                 session['rol'] = user['rol']
-                return redirect(url_for('admin'))
+            return redirect(url_for('admin'))
         
         return render_template('login.html', error='Credenciales inválidas')
     return render_template('login.html')
@@ -153,29 +153,29 @@ def admin():
 def pacientes():
     if 'logged_in' not in session:
         return redirect(url_for('login'))
-    conn = get_db_connection()
+        conn = get_db_connection()
 
-    if request.method == 'POST':
+        if request.method == 'POST':
         # Todos los usuarios pueden agregar pacientes
-        name = request.form['name']
-        identification_number = request.form['identification_number']
-        date_of_birth = request.form['date_of_birth']
-        gender = request.form['gender']
-        address = request.form['address']
-        phone = request.form['phone']
-        
-        conn.execute('''
-            INSERT INTO patients (name, identification_number, date_of_birth, gender, address, phone)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (name, identification_number, date_of_birth, gender, address, phone))
-        conn.commit()
-    search_name = request.args.get('search_name')
-    query = 'SELECT * FROM patients WHERE 1=1'
-    params = []
-    if search_name:
-        query += ' AND name LIKE ?'
-        params.append(f'%{search_name}%')
-    pacientes = conn.execute(query, params).fetchall()
+            name = request.form['name']
+            identification_number = request.form['identification_number']
+            date_of_birth = request.form['date_of_birth']
+            gender = request.form['gender']
+            address = request.form['address']
+            phone = request.form['phone']
+            
+            conn.execute('''
+                INSERT INTO patients (name, identification_number, date_of_birth, gender, address, phone)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (name, identification_number, date_of_birth, gender, address, phone))
+            conn.commit()
+        search_name = request.args.get('search_name')
+        query = 'SELECT * FROM patients WHERE 1=1'
+        params = []
+        if search_name:
+            query += ' AND name LIKE ?'
+            params.append(f'%{search_name}%')
+        pacientes = conn.execute(query, params).fetchall()
     
     # Obtener información del usuario para el menú
     username = session.get('username', 'Usuario')
@@ -185,7 +185,7 @@ def pacientes():
         user = conn.execute('SELECT nombre_completo FROM usuarios WHERE id = ?', (session['user_id'],)).fetchone()
         if user:
             nombre_completo = user['nombre_completo']
-    conn.close()
+        conn.close()
     
     return render_template('pacientes.html', pacientes=pacientes, is_admin=is_admin(), username=nombre_completo, rol=rol, current_user=session.get('username'))
 
@@ -676,7 +676,7 @@ def informacion():
                              carnet_busqueda=carnet,
                              is_public=True)
     
-    conn.close()
+        conn.close()
     return render_template('informacion.html', is_public=True)
 
 def export_to_excel_func():
@@ -863,12 +863,12 @@ def generar_reporte_prueba_pdf(prueba_id):
     return buffer
 
 def generar_pdf_pacientes_detallado():
-    """Genera un PDF detallado con todos los pacientes"""
+    """Genera un PDF detallado con todos los pacientes en formato horizontal"""
     conn = get_db_connection()
     pacientes = conn.execute('SELECT * FROM patients ORDER BY name').fetchall()
     conn.close()
     
-    pdf = FPDF()
+    pdf = FPDF(orientation='L')  # Landscape (horizontal)
     pdf.add_page()
     
     # Encabezado
@@ -884,72 +884,82 @@ def generar_pdf_pacientes_detallado():
     pdf.cell(0, 10, f'Total de Pacientes: {len(pacientes)}', 0, 1, 'L')
     pdf.ln(5)
     
-    # Tabla de pacientes
+    # Tabla de pacientes con todas las columnas
     pdf.set_font('Arial', 'B', 10)
     pdf.set_fill_color(200, 200, 200)
     
-    # Encabezados de tabla
-    pdf.cell(40, 10, 'ID', 1, 0, 'C', True)
-    pdf.cell(60, 10, 'Nombre', 1, 0, 'C', True)
-    pdf.cell(40, 10, 'Identificación', 1, 0, 'C', True)
-    pdf.cell(30, 10, 'Fecha Nac.', 1, 0, 'C', True)
-    pdf.cell(25, 10, 'Género', 1, 1, 'C', True)
+    # Encabezados de tabla - formato horizontal permite más columnas
+    pdf.cell(50, 10, 'Nombre', 1, 0, 'C', True)
+    pdf.cell(40, 10, 'Carnet de Identidad', 1, 0, 'C', True)
+    pdf.cell(35, 10, 'Fecha Nacimiento', 1, 0, 'C', True)
+    pdf.cell(25, 10, 'Género', 1, 0, 'C', True)
+    pdf.cell(80, 10, 'Dirección', 1, 0, 'C', True)
+    pdf.cell(40, 10, 'Teléfono', 1, 1, 'C', True)
     
     pdf.set_font('Arial', '', 9)
     pdf.set_fill_color(255, 255, 255)
     
     for paciente in pacientes:
-        # Verificar si necesitamos nueva página
-        if pdf.get_y() > 270:
+        # Verificar si necesitamos nueva página (altura disponible en landscape)
+        if pdf.get_y() > 180:
             pdf.add_page()
             # Repetir encabezados
             pdf.set_font('Arial', 'B', 10)
             pdf.set_fill_color(200, 200, 200)
-            pdf.cell(40, 10, 'ID', 1, 0, 'C', True)
-            pdf.cell(60, 10, 'Nombre', 1, 0, 'C', True)
-            pdf.cell(40, 10, 'Identificación', 1, 0, 'C', True)
-            pdf.cell(30, 10, 'Fecha Nac.', 1, 0, 'C', True)
-            pdf.cell(25, 10, 'Género', 1, 1, 'C', True)
+            pdf.cell(50, 10, 'Nombre', 1, 0, 'C', True)
+            pdf.cell(40, 10, 'Carnet de Identidad', 1, 0, 'C', True)
+            pdf.cell(35, 10, 'Fecha Nacimiento', 1, 0, 'C', True)
+            pdf.cell(25, 10, 'Género', 1, 0, 'C', True)
+            pdf.cell(80, 10, 'Dirección', 1, 0, 'C', True)
+            pdf.cell(40, 10, 'Teléfono', 1, 1, 'C', True)
             pdf.set_font('Arial', '', 9)
             pdf.set_fill_color(255, 255, 255)
         
-        pdf.cell(40, 8, str(paciente['id']), 1, 0, 'C')
-        pdf.cell(60, 8, paciente['name'][:28], 1, 0, 'L')  # Limitar longitud
-        pdf.cell(40, 8, paciente['identification_number'], 1, 0, 'C')
-        pdf.cell(30, 8, paciente['date_of_birth'], 1, 0, 'C')
-        pdf.cell(25, 8, paciente['gender'][:8], 1, 1, 'C')
-    
-    # Agregar segunda tabla con información adicional
-    pdf.add_page()
-    pdf.set_font('Arial', 'B', 16)
-    pdf.cell(0, 10, 'INFORMACIÓN ADICIONAL DE PACIENTES', 0, 1, 'L')
-    pdf.ln(5)
-    
-    pdf.set_font('Arial', 'B', 10)
-    pdf.set_fill_color(200, 200, 200)
-    pdf.cell(40, 10, 'ID', 1, 0, 'C', True)
-    pdf.cell(80, 10, 'Nombre', 1, 0, 'C', True)
-    pdf.cell(70, 10, 'Dirección', 1, 1, 'C', True)
-    
-    pdf.set_font('Arial', '', 9)
-    pdf.set_fill_color(255, 255, 255)
-    
-    for paciente in pacientes:
-        if pdf.get_y() > 270:
-            pdf.add_page()
-            pdf.set_font('Arial', 'B', 10)
-            pdf.set_fill_color(200, 200, 200)
-            pdf.cell(40, 10, 'ID', 1, 0, 'C', True)
-            pdf.cell(80, 10, 'Nombre', 1, 0, 'C', True)
-            pdf.cell(70, 10, 'Dirección', 1, 1, 'C', True)
-            pdf.set_font('Arial', '', 9)
-            pdf.set_fill_color(255, 255, 255)
+        # Obtener valores completos
+        nombre = str(paciente['name'])
+        carnet = str(paciente['identification_number'])
+        fecha_nac = str(paciente['date_of_birth'])
+        genero = str(paciente['gender'])
+        direccion = str(paciente['address'])
+        telefono = str(paciente['phone'])
         
-        pdf.cell(40, 8, str(paciente['id']), 1, 0, 'C')
-        pdf.cell(80, 8, paciente['name'][:35], 1, 0, 'L')
-        # Dirección puede ser larga, usar multi_cell si es necesario
-        direccion = paciente['address'][:30] if len(paciente['address']) <= 30 else paciente['address'][:27] + '...'
-        pdf.cell(70, 8, direccion, 1, 1, 'L')
+        # Escribir datos - calcular altura necesaria primero
+        x_inicio = pdf.get_x()
+        y_inicio = pdf.get_y()
+        
+        # Calcular alturas necesarias para cada campo
+        pdf.set_font('Arial', '', 9)
+        altura_nombre = max(8, (len(nombre) // 30 + 1) * 6)
+        altura_direccion = max(8, (len(direccion) // 40 + 1) * 6)
+        altura_max = max(altura_nombre, altura_direccion, 8)
+        
+        # Escribir cada celda con la altura máxima
+        # Nombre (puede ser largo, usar multi_cell)
+        pdf.set_xy(x_inicio, y_inicio)
+        pdf.multi_cell(50, 6, nombre, 1, 'L', False)
+        pdf.set_xy(x_inicio + 50, y_inicio)
+        
+        # Carnet de Identidad
+        pdf.cell(40, altura_max, carnet, 1, 0, 'C')
+        pdf.set_xy(x_inicio + 90, y_inicio)
+        
+        # Fecha Nacimiento
+        pdf.cell(35, altura_max, fecha_nac, 1, 0, 'C')
+        pdf.set_xy(x_inicio + 125, y_inicio)
+        
+        # Género
+        pdf.cell(25, altura_max, genero, 1, 0, 'C')
+        pdf.set_xy(x_inicio + 150, y_inicio)
+        
+        # Dirección (puede ser muy larga, usar multi_cell)
+        pdf.multi_cell(80, 6, direccion, 1, 'L', False)
+        pdf.set_xy(x_inicio + 230, y_inicio)
+        
+        # Teléfono
+        pdf.cell(40, altura_max, telefono, 1, 0, 'C')
+        
+        # Mover al siguiente renglón usando la altura máxima
+        pdf.set_xy(10, y_inicio + altura_max)
     
     # Pie de página
     pdf.set_text_color(128, 128, 128)
@@ -962,7 +972,7 @@ def generar_pdf_pacientes_detallado():
     return buffer
 
 def generar_pdf_pruebas_detallado():
-    """Genera un PDF detallado con todas las pruebas de pacientes"""
+    """Genera un PDF detallado con todas las pruebas de pacientes en formato horizontal"""
     conn = get_db_connection()
     pruebas = conn.execute(''' 
         SELECT 
@@ -984,7 +994,7 @@ def generar_pdf_pruebas_detallado():
     ''').fetchall()
     conn.close()
     
-    pdf = FPDF()
+    pdf = FPDF(orientation='L')  # Landscape (horizontal)
     pdf.add_page()
     
     # Encabezado
@@ -1000,45 +1010,97 @@ def generar_pdf_pruebas_detallado():
     pdf.cell(0, 10, f'Total de Pruebas: {len(pruebas)}', 0, 1, 'L')
     pdf.ln(5)
     
-    # Tabla principal
-    pdf.set_font('Arial', 'B', 9)
+    # Tabla principal con todas las columnas
+    pdf.set_font('Arial', 'B', 10)
     pdf.set_fill_color(200, 200, 200)
     
-    # Encabezados
-    pdf.cell(30, 8, 'Paciente', 1, 0, 'C', True)
-    pdf.cell(35, 8, 'Prueba', 1, 0, 'C', True)
-    pdf.cell(25, 8, 'Código', 1, 0, 'C', True)
-    pdf.cell(30, 8, 'Fecha Prueba', 1, 0, 'C', True)
-    pdf.cell(30, 8, 'Resultado', 1, 0, 'C', True)
-    pdf.cell(30, 8, 'Laboratorio', 1, 1, 'C', True)
+    # Encabezados - formato horizontal permite más columnas
+    pdf.cell(45, 10, 'Paciente', 1, 0, 'C', True)
+    pdf.cell(40, 10, 'Prueba', 1, 0, 'C', True)
+    pdf.cell(30, 10, 'Código', 1, 0, 'C', True)
+    pdf.cell(35, 10, 'Fecha Prueba', 1, 0, 'C', True)
+    pdf.cell(35, 10, 'Resultado', 1, 0, 'C', True)
+    pdf.cell(35, 10, 'Fecha Resultado', 1, 0, 'C', True)
+    pdf.cell(50, 10, 'Laboratorio', 1, 1, 'C', True)
     
-    pdf.set_font('Arial', '', 8)
+    pdf.set_font('Arial', '', 9)
     pdf.set_fill_color(255, 255, 255)
     
     for prueba in pruebas:
-        if pdf.get_y() > 270:
+        # Verificar si necesitamos nueva página (altura disponible en landscape)
+        if pdf.get_y() > 180:
             pdf.add_page()
-            pdf.set_font('Arial', 'B', 9)
+            pdf.set_font('Arial', 'B', 10)
             pdf.set_fill_color(200, 200, 200)
-            pdf.cell(30, 8, 'Paciente', 1, 0, 'C', True)
-            pdf.cell(35, 8, 'Prueba', 1, 0, 'C', True)
-            pdf.cell(25, 8, 'Código', 1, 0, 'C', True)
-            pdf.cell(30, 8, 'Fecha Prueba', 1, 0, 'C', True)
-            pdf.cell(30, 8, 'Resultado', 1, 0, 'C', True)
-            pdf.cell(30, 8, 'Laboratorio', 1, 1, 'C', True)
-            pdf.set_font('Arial', '', 8)
+            pdf.cell(45, 10, 'Paciente', 1, 0, 'C', True)
+            pdf.cell(40, 10, 'Prueba', 1, 0, 'C', True)
+            pdf.cell(30, 10, 'Código', 1, 0, 'C', True)
+            pdf.cell(35, 10, 'Fecha Prueba', 1, 0, 'C', True)
+            pdf.cell(35, 10, 'Resultado', 1, 0, 'C', True)
+            pdf.cell(35, 10, 'Fecha Resultado', 1, 0, 'C', True)
+            pdf.cell(50, 10, 'Laboratorio', 1, 1, 'C', True)
+            pdf.set_font('Arial', '', 9)
             pdf.set_fill_color(255, 255, 255)
         
-        paciente = prueba['patient_name'][:20] if len(prueba['patient_name']) <= 20 else prueba['patient_name'][:17] + '...'
-        prueba_nombre = prueba['test_name'][:20] if len(prueba['test_name']) <= 20 else prueba['test_name'][:17] + '...'
-        laboratorio = prueba['laboratory'][:20] if len(prueba['laboratory']) <= 20 else prueba['laboratory'][:17] + '...'
+        # Obtener valores completos sin truncar
+        paciente = str(prueba['patient_name'])
+        prueba_nombre = str(prueba['test_name'])
+        codigo = str(prueba['test_code'])
+        fecha_prueba = str(prueba['test_date'])
+        resultado = str(prueba['result'])
+        fecha_resultado = str(prueba['result_date'])
+        laboratorio = str(prueba['laboratory'])
         
-        pdf.cell(30, 8, paciente, 1, 0, 'L')
-        pdf.cell(35, 8, prueba_nombre, 1, 0, 'L')
-        pdf.cell(25, 8, prueba['test_code'], 1, 0, 'C')
-        pdf.cell(30, 8, prueba['test_date'], 1, 0, 'C')
-        pdf.cell(30, 8, prueba['result'][:15], 1, 0, 'C')
-        pdf.cell(30, 8, laboratorio, 1, 1, 'L')
+        # Calcular altura necesaria para la fila basada en el texto más largo
+        lineas_paciente = max(1, (len(paciente) // 25))
+        lineas_prueba = max(1, (len(prueba_nombre) // 25))
+        lineas_laboratorio = max(1, (len(laboratorio) // 30))
+        max_lineas = max(lineas_paciente, lineas_prueba, lineas_laboratorio, 1)
+        altura_fila = max(8, max_lineas * 6)
+        
+        # Escribir datos - calcular altura necesaria primero
+        x_inicio = pdf.get_x()
+        y_inicio = pdf.get_y()
+        
+        # Calcular alturas necesarias para cada campo
+        pdf.set_font('Arial', '', 9)
+        altura_paciente = max(8, (len(paciente) // 25 + 1) * 6)
+        altura_prueba = max(8, (len(prueba_nombre) // 25 + 1) * 6)
+        altura_laboratorio = max(8, (len(laboratorio) // 30 + 1) * 6)
+        altura_max = max(altura_paciente, altura_prueba, altura_laboratorio, 8)
+        
+        # Escribir cada celda con la altura máxima
+        # Paciente (puede ser largo, usar multi_cell)
+        pdf.set_xy(x_inicio, y_inicio)
+        pdf.multi_cell(45, 6, paciente, 1, 'L', False)
+        pdf.set_xy(x_inicio + 45, y_inicio)
+        
+        # Prueba (puede ser largo, usar multi_cell)
+        pdf.multi_cell(40, 6, prueba_nombre, 1, 'L', False)
+        pdf.set_xy(x_inicio + 85, y_inicio)
+        
+        # Código
+        pdf.cell(30, altura_max, codigo, 1, 0, 'C')
+        pdf.set_xy(x_inicio + 115, y_inicio)
+        
+        # Fecha Prueba
+        pdf.cell(35, altura_max, fecha_prueba, 1, 0, 'C')
+        pdf.set_xy(x_inicio + 150, y_inicio)
+        
+        # Resultado
+        pdf.cell(35, altura_max, resultado, 1, 0, 'C')
+        pdf.set_xy(x_inicio + 185, y_inicio)
+        
+        # Fecha Resultado
+        pdf.cell(35, altura_max, fecha_resultado, 1, 0, 'C')
+        pdf.set_xy(x_inicio + 220, y_inicio)
+        
+        # Laboratorio (puede ser largo, usar multi_cell)
+        pdf.multi_cell(50, 6, laboratorio, 1, 'L', False)
+        pdf.set_xy(x_inicio + 270, y_inicio)
+        
+        # Mover al siguiente renglón usando la altura máxima
+        pdf.set_xy(10, y_inicio + altura_max)
     
     # Pie de página
     pdf.set_text_color(128, 128, 128)
