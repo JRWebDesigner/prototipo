@@ -138,44 +138,98 @@ def admin():
     if 'logged_in' in session:
         username = session.get('username', 'Usuario')
         rol = session.get('rol', 'Sin rol')
+
         # Obtener nombre completo si es un usuario de la BD
         nombre_completo = username
         if 'user_id' in session:
             conn = get_db_connection()
-            user = conn.execute('SELECT nombre_completo FROM usuarios WHERE id = ?', (session['user_id'],)).fetchone()
+            user = conn.execute(
+                'SELECT nombre_completo FROM usuarios WHERE id = ?',
+                (session['user_id'],)
+            ).fetchone()
             conn.close()
             if user:
                 nombre_completo = user['nombre_completo']
-        return render_template('admin.html', username=nombre_completo, rol=rol, current_user=session.get('username'))
+
+        # Obtener datos de pruebas por categoría para la gráfica
+        conn = get_db_connection()
+
+        # Total real de pruebas (todas las realizadas)
+        total_pruebas_real = conn.execute(
+            'SELECT COUNT(*) FROM pruebas_paciente'
+        ).fetchone()[0]
+
+        # Conteo de pruebas por categoría (tipo de prueba)
+        # Evita duplicados si hay nombres repetidos en la tabla "pruebas"
+        pruebas_por_categoria = conn.execute('''
+            SELECT 
+                t.name AS categoria,
+                COUNT(DISTINCT pp.id) AS cantidad
+            FROM pruebas_paciente pp
+            JOIN (
+                SELECT DISTINCT id, name FROM pruebas
+            ) t ON pp.test_id = t.id
+            GROUP BY t.name
+            ORDER BY cantidad DESC
+        ''').fetchall()
+
+        conn.close()
+
+        # Convertir los resultados a formato JSON para la plantilla
+        datos_grafica = [
+            {'categoria': row['categoria'], 'cantidad': row['cantidad']}
+            for row in pruebas_por_categoria
+        ]
+
+        # Validar totales
+        total_calculado = sum(row['cantidad'] for row in datos_grafica)
+        print("DEBUG -> Total real:", total_pruebas_real)
+        print("DEBUG -> Total gráfico:", total_calculado)
+
+        # Contexto para el template
+        context = get_user_context()
+        context.update({
+            'username': nombre_completo,
+            'rol': rol,
+            'current_user': session.get('username'),
+            'datos_grafica': datos_grafica,
+            'total_pruebas_real': total_pruebas_real
+        })
+
+        return render_template('admin.html', **context)
+
+    # Si no hay sesión activa, redirigir al login
     return redirect(url_for('login'))
 
 @app.route('/pacientes', methods=['GET', 'POST'])
 def pacientes():
     if 'logged_in' not in session:
         return redirect(url_for('login'))
-        conn = get_db_connection()
+    
+    conn = get_db_connection()
 
-        if request.method == 'POST':
+    if request.method == 'POST':
         # Todos los usuarios pueden agregar pacientes
-            name = request.form['name']
-            identification_number = request.form['identification_number']
-            date_of_birth = request.form['date_of_birth']
-            gender = request.form['gender']
-            address = request.form['address']
-            phone = request.form['phone']
-            
-            conn.execute('''
-                INSERT INTO patients (name, identification_number, date_of_birth, gender, address, phone)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (name, identification_number, date_of_birth, gender, address, phone))
-            conn.commit()
-        search_name = request.args.get('search_name')
-        query = 'SELECT * FROM patients WHERE 1=1'
-        params = []
-        if search_name:
-            query += ' AND name LIKE ?'
-            params.append(f'%{search_name}%')
-        pacientes = conn.execute(query, params).fetchall()
+        name = request.form['name']
+        identification_number = request.form['identification_number']
+        date_of_birth = request.form['date_of_birth']
+        gender = request.form['gender']
+        address = request.form['address']
+        phone = request.form['phone']
+        
+        conn.execute('''
+            INSERT INTO patients (name, identification_number, date_of_birth, gender, address, phone)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (name, identification_number, date_of_birth, gender, address, phone))
+        conn.commit()
+        
+    search_name = request.args.get('search_name')
+    query = 'SELECT * FROM patients WHERE 1=1'
+    params = []
+    if search_name:
+        query += ' AND name LIKE ?'
+        params.append(f'%{search_name}%')
+    pacientes = conn.execute(query, params).fetchall()
     
     # Obtener información del usuario para el menú
     username = session.get('username', 'Usuario')
@@ -226,7 +280,10 @@ def eliminar_paciente(id):
 def pruebas_paciente():
     if 'logged_in' not in session:
         return redirect(url_for('login'))
+    
     conn = get_db_connection()
+    
+    # Manejar la creación de una nueva prueba
     if request.method == 'POST':
         patient_id = request.form['patient_id']
         test_id = request.form['test_id']
@@ -235,11 +292,24 @@ def pruebas_paciente():
         result_date = request.form['result_date']
         laboratory = request.form['laboratory']
         
-        conn.execute('INSERT INTO pruebas_paciente (patient_id, test_id, test_date, result, result_date, laboratory) VALUES (?, ?, ?, ?, ?, ?)',
-                     (patient_id, test_id, test_date, result, result_date, laboratory))
+        conn.execute('''
+            INSERT INTO pruebas_paciente 
+            (patient_id, test_id, test_date, result, result_date, laboratory) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (patient_id, test_id, test_date, result, result_date, laboratory))
         conn.commit()
+    
+    # Obtener la lista de pacientes para el select
     pacientes = conn.execute('SELECT id, name FROM patients').fetchall()
-    pruebas = conn.execute('SELECT id, name FROM pruebas').fetchall()
+    
+    # Obtener solo las pruebas específicas (PCR, Antígeno, Anticuerpo)
+    pruebas = conn.execute('''
+        SELECT id, name 
+        FROM pruebas 
+        WHERE name IN ('PCR', 'Antígeno', 'Anticuerpo')
+    ''').fetchall()
+    
+    # Buscar pruebas por nombre de paciente si se especifica
     search_name = request.args.get('search_name')
     query = '''
         SELECT
@@ -259,16 +329,37 @@ def pruebas_paciente():
     if search_name:
         query += ' AND p.name LIKE ?'
         params.append(f'%{search_name}%')
+    query += ' ORDER BY pp.test_date DESC, pp.id DESC'
+    
+    # Obtener las pruebas registradas
     pruebas_paciente = conn.execute(query, params).fetchall()
     conn.close()
-    context = get_user_context()
-    context.update({
-        'pacientes': pacientes,
-        'pruebas': pruebas,
-        'pruebas_paciente': pruebas_paciente,
-        'is_admin': is_admin()
-    })
-    return render_template('pruebas_paciente.html', **context)
+    
+    # Obtener información del usuario y rol para el menú
+    username = session.get('username', 'Usuario')
+    rol = session.get('rol', 'Sin rol')
+    
+    # Obtener nombre completo si es un usuario de la BD
+    nombre_completo = username
+    if 'user_id' in session:
+        conn = get_db_connection()
+        user = conn.execute(
+            'SELECT nombre_completo FROM usuarios WHERE id = ?',
+            (session['user_id'],)
+        ).fetchone()
+        conn.close()
+        if user:
+            nombre_completo = user['nombre_completo']
+    
+    # Renderizar la plantilla con todos los datos necesarios
+    return render_template('pruebas_paciente.html',
+                         pacientes=pacientes,
+                         pruebas=pruebas,
+                         pruebas_paciente=pruebas_paciente,
+                         is_admin=is_admin(),
+                         username=nombre_completo,
+                         rol=rol,
+                         current_user=session.get('username'))
 @app.route('/editar_prueba_paciente/<int:id>', methods=['GET', 'POST'])
 @require_role('admin')
 def editar_prueba_paciente(id):
@@ -278,7 +369,12 @@ def editar_prueba_paciente(id):
         conn.close()
         return "Prueba no encontrada", 404
     pacientes = conn.execute('SELECT id, name FROM patients').fetchall()
-    pruebas = conn.execute('SELECT id, name FROM pruebas').fetchall()
+    # Solo seleccionar PCR, Antígeno y Anticuerpos
+    pruebas = conn.execute('''
+        SELECT id, name 
+        FROM pruebas 
+        WHERE name IN ('PCR', 'Antígeno', 'Anticuerpos')
+    ''').fetchall()
     if request.method == 'POST':
         patient_id = request.form['patient_id']
         test_id = request.form['test_id']

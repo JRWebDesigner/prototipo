@@ -23,9 +23,9 @@
                     <label for="test_id" class="block text-sm font-medium text-gray-700 mb-1">Prueba:</label>
                     <select name="test_id" id="test_id" required 
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                        {% for prueba in pruebas %}
-                        <option value="{{ prueba.id }}">{{ prueba.name }}</option>
-                        {% endfor %}
+                        <option value="1">PCR</option>
+                        <option value="2">Antígeno</option>
+                        <option value="3">Anticuerpo</option>
                     </select>
                 </div>
                 
@@ -39,8 +39,8 @@
                     <label for="result" class="block text-sm font-medium text-gray-700 mb-1">Resultado:</label>
                     <select id="result" name="result" required 
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                        <option value="Masculino">Positivo</option>
-                        <option value="Femenino">Negativo</option>
+                        <option value="Positivo">Positivo</option>
+                        <option value="Negativo">Negativo</option>
                     </select>
                 </div>
                 
@@ -102,7 +102,18 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ prueba.patient_name }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ prueba.test_name }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ prueba.test_date }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ prueba.result }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            {% set resultado = prueba.result|string %}
+                            {% if resultado|lower == 'positivo' or resultado|lower == 'positive' %}
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Positivo</span>
+                            {% elif resultado|lower == 'negativo' or resultado|lower == 'negative' %}
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Negativo</span>
+                            {% elif resultado|lower == 'masculino' or resultado|lower == 'femenino' %}
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800" title="Valor incorrecto - debe editarse">❌ {{ resultado }}</span>
+                            {% else %}
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">{{ resultado }}</span>
+                            {% endif %}
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ prueba.result_date }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ prueba.laboratory }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
