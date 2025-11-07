@@ -364,17 +364,28 @@ def pruebas_paciente():
 @require_role('admin')
 def editar_prueba_paciente(id):
     conn = get_db_connection()
-    prueba = conn.execute('SELECT * FROM pruebas_paciente WHERE id = ?', (id,)).fetchone()
+    # Obtener la prueba específica con información detallada
+    prueba = conn.execute('''
+        SELECT pp.*, p.name as patient_name
+        FROM pruebas_paciente pp
+        LEFT JOIN patients p ON pp.patient_id = p.id
+        WHERE pp.id = ?
+    ''', (id,)).fetchone()
+    
     if prueba is None:
         conn.close()
         return "Prueba no encontrada", 404
+        
+    # Obtener lista de pacientes para el select
     pacientes = conn.execute('SELECT id, name FROM patients').fetchall()
-    # Solo seleccionar PCR, Antígeno y Anticuerpos
+    
+    # Solo seleccionar PCR, Antígeno y Anticuerpo
     pruebas = conn.execute('''
         SELECT id, name 
         FROM pruebas 
-        WHERE name IN ('PCR', 'Antígeno', 'Anticuerpos')
+        WHERE name IN ('PCR', 'Antígeno', 'Anticuerpo')
     ''').fetchall()
+    
     if request.method == 'POST':
         patient_id = request.form['patient_id']
         test_id = request.form['test_id']
@@ -382,13 +393,35 @@ def editar_prueba_paciente(id):
         result = request.form['result']
         result_date = request.form['result_date']
         laboratory = request.form['laboratory']
-        conn.execute('UPDATE pruebas_paciente SET patient_id = ?, test_id = ?, test_date = ?, result = ?, result_date = ?, laboratory = ? WHERE id = ?',
-                     (patient_id, test_id, test_date, result, result_date, laboratory, id))
+        
+        # Actualizar la prueba
+        conn.execute('''
+            UPDATE pruebas_paciente 
+            SET patient_id = ?, 
+                test_id = ?, 
+                test_date = ?, 
+                result = ?, 
+                result_date = ?, 
+                laboratory = ? 
+            WHERE id = ?
+        ''', (patient_id, test_id, test_date, result, result_date, laboratory, id))
+        
         conn.commit()
         conn.close()
         return redirect(url_for('pruebas_paciente'))
+    
     conn.close()
-    return render_template('editar_prueba_paciente.html', prueba=prueba, pacientes=pacientes, pruebas=pruebas)
+    
+    # Obtener el contexto del usuario y agregar las variables adicionales
+    context = get_user_context()
+    context.update({
+        'prueba': prueba,
+        'pacientes': pacientes,
+        'pruebas': pruebas,
+        'is_admin': is_admin()
+    })
+    
+    return render_template('editar_prueba_paciente.html', **context)
 
 @app.route('/eliminar_prueba_paciente/<int:id>')
 @require_role('admin')
