@@ -264,8 +264,13 @@ def editar_paciente(id):
         conn.commit()
         conn.close()
         return redirect(url_for('pacientes'))
+    context = get_user_context()
+    context.update({
+        'paciente': paciente,
+        'is_admin': is_admin()
+    })
     conn.close()
-    return render_template('editar_paciente.html', paciente=paciente)
+    return render_template('editar_paciente.html', **context)
 
 @app.route('/eliminar_paciente/<int:id>')
 @require_role('admin')
@@ -517,8 +522,13 @@ def editar_prueba(id):
         conn.commit()
         conn.close()
         return redirect(url_for('pruebas'))
+    context = get_user_context()
+    context.update({
+        'prueba': prueba,
+        'is_admin': is_admin()
+    })
     conn.close()
-    return render_template('editar_prueba.html', prueba=prueba)
+    return render_template('editar_prueba.html', **context)
 
 @app.route('/eliminar_prueba/<int:id>')
 @require_role('admin')
@@ -576,6 +586,7 @@ def usuarios():
 def editar_usuario(id):
     conn = get_db_connection()
     user = conn.execute('SELECT * FROM usuarios WHERE id = ?', (id,)).fetchone()
+
     if request.method == 'POST':
         nombre = request.form['nombre_completo']
         correo = request.form['correo_electronico']
@@ -583,26 +594,53 @@ def editar_usuario(id):
         telefono = request.form['numero_telefono']
         rol = request.form['rol']
         estado = request.form['estado']
+        
         # Normalizar el rol
         if rol == "Administrador":
             rol = "admin"
         elif rol == "Empleado":
             rol = "empleado"
+            
         password = request.form.get('contraseña')
-        conn.execute('UPDATE usuarios SET nombre_completo = ?, correo_electronico = ?, nombre_usuario = ?, numero_telefono = ?, rol = ?, estado = ? WHERE id = ?',
-                     (nombre, correo, nombre_usuario, telefono, rol, estado, id))
+        
         if password:
+            # Si se proporcionó una nueva contraseña, actualizamos todos los campos incluyendo la contraseña
             hashed_password = generate_password_hash(password)
-            conn.execute('UPDATE usuarios SET nombre_completo = ?, correo_electronico = ?, nombre_usuario = ?, numero_telefono = ?, rol = ?, estado = ?, contraseña = ? WHERE id = ?',
-                         (nombre, correo, nombre_usuario, telefono, rol, estado, hashed_password, id))
+            conn.execute('''
+                UPDATE usuarios 
+                SET nombre_completo = ?, 
+                    correo_electronico = ?, 
+                    nombre_usuario = ?, 
+                    numero_telefono = ?, 
+                    rol = ?, 
+                    estado = ?,
+                    contraseña = ?
+                WHERE id = ?
+            ''', (nombre, correo, nombre_usuario, telefono, rol, estado, hashed_password, id))
         else:
-            conn.execute('UPDATE usuarios SET nombre_completo = ?, correo_electronico = ?, nombre_usuario = ?, numero_telefono = ?, rol = ?, estado = ? WHERE id = ?',
-                         (nombre, correo, nombre_usuario, telefono, rol, estado, id))
+            # Si no se proporcionó contraseña, actualizamos todos los campos excepto la contraseña
+            conn.execute('''
+                UPDATE usuarios 
+                SET nombre_completo = ?, 
+                    correo_electronico = ?, 
+                    nombre_usuario = ?, 
+                    numero_telefono = ?, 
+                    rol = ?, 
+                    estado = ?
+                WHERE id = ?
+            ''', (nombre, correo, nombre_usuario, telefono, rol, estado, id))
+        
         conn.commit()
         conn.close()
         return redirect(url_for('usuarios'))
+        
+    context = get_user_context()
+    context.update({
+        'user': user,
+        'is_admin': is_admin()
+    })
     conn.close()
-    return render_template('editar_usuario.html', user=user)
+    return render_template('editar_usuario.html', **context)
 
 @app.route('/eliminar_usuario/<int:id>')
 @require_role('admin')
